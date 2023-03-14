@@ -5,7 +5,7 @@ console.log("el password es: " + process.env.PASSWORD_MONGODB)
 const config = {
   name: 'mongodb',
   connector: 'mongodb',
-  url: `mongodb+srv://${process.env.USER_MONGODB}:${process.env.PASSWORD_MONGODB}@clusteranki.jakhxmi.mongodb.net/ms-seguridad?retryWrites=true&w=majority`,
+  url: `mongodb+srv://${process.env.USER_MONGODB}:${process.env.PASSWORD_MONGODB}@clusteranki.jakhxmi.mongodb.net/akinmueble_security_ms?retryWrites=true&w=majority`,
   host: 'localhost',
   port: 27017,
   user: '',
