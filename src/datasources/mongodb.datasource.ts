@@ -1,7 +1,7 @@
 import {inject, lifeCycleObserver, LifeCycleObserver} from '@loopback/core';
 import {juggler} from '@loopback/repository';
 
-console.log('el password es: ' + process.env.PASSWORD_MONGODB);
+
 const config = {
   name: 'mongodb',
   connector: 'mongodb',
