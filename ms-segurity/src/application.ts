@@ -10,6 +10,9 @@ import {ServiceMixin} from '@loopback/service-proxy';
 import path from 'path';
 import {MySequence} from './sequence';
 
+import * as dotenv from 'dotenv'
+dotenv.config()
+
 export {ApplicationConfig};
 
 export class App extends BootMixin(
