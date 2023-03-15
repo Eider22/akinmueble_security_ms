@@ -16,7 +16,7 @@ export class Login extends Entity {
   code2fa: string;
 
   @property({
-    type: 'string',
+    type: 'boolean',
     required: true,
   })
   codeState2fa: boolean;
