@@ -5,3 +5,7 @@ export * from './role-menu.controller';
 export * from './menu-role.controller';
 export * from './role-user.controller';
 export * from './user-role.controller';
+export * from './user.controller';
+export * from './menu.controller';
+export * from './login.controller';
+export * from './role.controller';
