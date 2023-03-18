@@ -1,3 +1,4 @@
+import {service} from '@loopback/core';
 import {
   Count,
   CountSchema,
@@ -19,11 +20,14 @@ import {
 } from '@loopback/rest';
 import {User} from '../models';
 import {UserRepository} from '../repositories';
+import {SecurityUserService} from '../services';
 
 export class UserController {
   constructor(
     @repository(UserRepository)
     public userRepository : UserRepository,
+    @service(SecurityUserService)
+    public serviceSecurity : SecurityUserService
   ) {}
 
   @post('/user')
@@ -44,6 +48,11 @@ export class UserController {
     })
     user: Omit<User, '_id'>,
   ): Promise<User> {
+    // eslint-disable-next-line prefer-const
+    let password = this.serviceSecurity.createPassword();
+    // eslint-disable-next-line prefer-const
+    let passwordEncripted= this.serviceSecurity.encriptedText(password);
+    user.password= passwordEncripted;
     return this.userRepository.create(user);
   }
 
