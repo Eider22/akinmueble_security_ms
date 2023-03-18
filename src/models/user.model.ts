@@ -47,9 +47,8 @@ export class User extends Entity {
 
   @property({
     type: 'string',
-    required: true,
   })
-  password: string;
+  password?: string;
 
   @hasMany(() => Login)
   logins: Login[];
