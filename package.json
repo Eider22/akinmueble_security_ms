@@ -55,7 +55,6 @@
     "@loopback/rest": "^12.0.9",
     "@loopback/rest-explorer": "^5.0.9",
     "@loopback/service-proxy": "^5.0.9",
-    "cript.js": "^1.1.3",
     "crypto-js": "^4.1.1",
     "dotenv": "^16.0.3",
     "generate-password": "^1.7.0",

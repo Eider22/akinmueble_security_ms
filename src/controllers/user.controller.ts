@@ -50,7 +50,6 @@ export class UserController {
   ): Promise<User> {
     // eslint-disable-next-line prefer-const
     let password = this.serviceSecurity.createPassword();
-    console.log(password);
     // eslint-disable-next-line prefer-const
     let passwordEncripted= this.serviceSecurity.encriptedText(password);
     user.password= passwordEncripted;
