@@ -1,25 +1,19 @@
-import {service} from '@loopback/core';
+import {service} from '@loopback/cnpmore';
 import {
   Count,
   CountSchema,
   Filter,
   FilterExcludingWhere,
   repository,
-  Where,
+  Where
 } from '@loopback/repository';
 import {
-  post,
-  param,
-  get,
-  getModelSchemaRef,
-  patch,
-  put,
-  del,
-  requestBody,
-  response,
+  del, get,
+  getModelSchemaRef, HttpErrors, param, patch, post, put, requestBody,
+  response
 } from '@loopback/rest';
-import {User} from '../models';
-import {UserRepository} from '../repositories';
+import {Login, User} from '../models';
+import {LoginRepository, UserRepository} from '../repositories';
 import {SecurityUserService} from '../services';
 
 export class UserController {
@@ -27,7 +21,9 @@ export class UserController {
     @repository(UserRepository)
     public userRepository : UserRepository,
     @service(SecurityUserService)
-    public serviceSecurity : SecurityUserService
+    public serviceSecurity : SecurityUserService,
+    @repository(LoginRepository)
+    public repositoryLogin : LoginRepository
   ) {}
 
   @post('/user')
@@ -49,7 +45,7 @@ export class UserController {
     user: Omit<User, '_id'>,
   ): Promise<User> {
     // eslint-disable-next-line prefer-const
-    let password = this.serviceSecurity.createPassword();
+    let password = this.serviceSecurity.createTextRandom(10);
     // eslint-disable-next-line prefer-const
     let passwordEncripted= this.serviceSecurity.encriptedText(password);
     user.password= passwordEncripted;
@@ -156,4 +152,44 @@ export class UserController {
   async deleteById(@param.path.string('id') id: string): Promise<void> {
     await this.userRepository.deleteById(id);
   }
+
+   /**
+ * metodos personalizados para la Api
+ *
+ */
+
+   @post('/identify-users')
+   @response(200, {
+     description: "identificar un usuario por correo y clave",
+     content: {'application/json': {schema: getModelSchemaRef(Credentials)}}
+   })
+   async identifyUser(
+     @requestBody(
+       {
+         content:{
+           'aplication/json':{
+             schema: getModelSchemaRef(Credentials)
+           }
+         }
+       }
+     )
+     credentials : Credentials
+   ): Promise<object> {
+    let user = this.serviceSecurity.identifyUser(credentials);
+    if (user) {
+      let code2fa = this.serviceSecurity.createTextRandom(5);
+      let login: Login = new Login();
+      login.userId = user._id!;
+      login.code2fa = code2fa;
+      login.codeState2fa = false;
+      login.token = "";
+      login.tokenState = false;
+      this.repositoryLogin.create(login);
+      // notify the user via mail or sms
+      return user;
+    }
+    return new HttpErrors[401]("incorrect credentials.");
+  }
+
+ }
 }
