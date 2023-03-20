@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-floating-promises */
+/* eslint-disable prefer-const */
 import {service} from '@loopback/core';
 import {
   Count,
@@ -8,26 +10,29 @@ import {
   Where,
 } from '@loopback/repository';
 import {
-  post,
-  param,
+  del,
   get,
   getModelSchemaRef,
+  HttpErrors,
+  param,
   patch,
+  post,
   put,
-  del,
   requestBody,
   response,
 } from '@loopback/rest';
-import {User} from '../models';
-import {UserRepository} from '../repositories';
+import {AuthenticationFactor, Credentials, Login, User} from '../models';
+import {LoginRepository, UserRepository} from '../repositories';
 import {SecurityUserService} from '../services';
 
 export class UserController {
   constructor(
     @repository(UserRepository)
-    public userRepository : UserRepository,
+    public userRepository: UserRepository,
     @service(SecurityUserService)
-    public serviceSecurity : SecurityUserService
+    public serviceSecurity: SecurityUserService,
+    @repository(LoginRepository)
+    public repositoryLogin: LoginRepository,
   ) {}
 
   @post('/user')
@@ -49,10 +54,10 @@ export class UserController {
     user: Omit<User, '_id'>,
   ): Promise<User> {
     // eslint-disable-next-line prefer-const
-    let password = this.serviceSecurity.createPassword();
+    let password = this.serviceSecurity.createTextRandom(10);
     // eslint-disable-next-line prefer-const
-    let passwordEncripted= this.serviceSecurity.encriptedText(password);
-    user.password= passwordEncripted;
+    let passwordEncripted = this.serviceSecurity.encriptedText(password);
+    user.password = passwordEncripted;
     return this.userRepository.create(user);
   }
 
@@ -61,9 +66,7 @@ export class UserController {
     description: 'User model count',
     content: {'application/json': {schema: CountSchema}},
   })
-  async count(
-    @param.where(User) where?: Where<User>,
-  ): Promise<Count> {
+  async count(@param.where(User) where?: Where<User>): Promise<Count> {
     return this.userRepository.count(where);
   }
 
@@ -79,9 +82,7 @@ export class UserController {
       },
     },
   })
-  async find(
-    @param.filter(User) filter?: Filter<User>,
-  ): Promise<User[]> {
+  async find(@param.filter(User) filter?: Filter<User>): Promise<User[]> {
     return this.userRepository.find(filter);
   }
 
@@ -115,7 +116,7 @@ export class UserController {
   })
   async findById(
     @param.path.string('id') id: string,
-    @param.filter(User, {exclude: 'where'}) filter?: FilterExcludingWhere<User>
+    @param.filter(User, {exclude: 'where'}) filter?: FilterExcludingWhere<User>,
   ): Promise<User> {
     return this.userRepository.findById(id, filter);
   }
@@ -155,5 +156,72 @@ export class UserController {
   })
   async deleteById(@param.path.string('id') id: string): Promise<void> {
     await this.userRepository.deleteById(id);
+  }
+
+  /**
+   * metodos personalizados para la Api
+   *
+   */
+
+  @post('/identify-user')
+  @response(200, {
+    description: 'identificar un usuario por correo y clave',
+    content: {'application/json': {schema: getModelSchemaRef(User)}},
+  })
+  async identifyUser(
+    @requestBody({
+      content: {
+        'aplication/json': {
+          schema: getModelSchemaRef(Credentials),
+        },
+      },
+    })
+    credentials: Credentials,
+  ): Promise<object> {
+    let user = await this.serviceSecurity.identifyUser(credentials);
+    if (!user) {
+      throw new HttpErrors[401]('incorrect credentials.');
+    }
+
+    let code2fa = this.serviceSecurity.createTextRandom(5);
+    let login: Login = new Login();
+    login.userId = user._id!;
+    login.code2fa = code2fa;
+    login.codeState2fa = false;
+    login.token = '';
+    login.tokenState = false;
+    this.repositoryLogin.create(login);
+    // notify the user via mail or sms
+    return user;
+  }
+
+  @post('/verify-2fa')
+  @response(200, {
+    description: 'verifica el 2fa',
+  })
+
+  /**
+   * I want to return an object with two properties: user and token.
+   * @param {AuthenticationFactor} credentials - AuthenticationFactor,
+   * @returns The user object and the token.
+   */
+  async verifyCode2FA(
+    @requestBody({
+      content: {
+        'aplication/json': {
+          schema: getModelSchemaRef(AuthenticationFactor),
+        },
+      },
+    })
+    credentials: AuthenticationFactor,
+  ): Promise<object> {
+    let user = await this.serviceSecurity.verifyCode2FA(credentials);
+    if (user) {
+      return {
+        // user:{
+        // },token:
+      };
+    }
+    throw new HttpErrors[401]('codigo de 2fa invalido.');
   }
 }
