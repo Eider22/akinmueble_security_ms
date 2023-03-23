@@ -226,6 +226,6 @@ export class UserController {
         };
       }
     }
-    return  new HttpErrors[401]('codigo de 2fa invalido para el usuario definido.');
+    throw new HttpErrors[401]('codigo de 2fa invalido para el usuario definido.');
   }
 }
