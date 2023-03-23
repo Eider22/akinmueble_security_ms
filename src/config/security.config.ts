@@ -1,3 +1,3 @@
 export namespace SecurityConfiguration{
-    export const keyJWT: string  = "Admin@2023*";
+    export const keyJWT: string  = process.env.KEY_JWT!;
 }
