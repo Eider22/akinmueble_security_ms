@@ -1,11 +1,13 @@
 /* eslint-disable prefer-const */
 import {/* inject, */ BindingScope, injectable} from '@loopback/core';
 import {repository} from '@loopback/repository';
+import { SecurityConfiguration } from '../config/security.config';
 import {AuthenticationFactor, Credentials, User} from '../models';
 import {LoginRepository, UserRepository} from '../repositories';
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 const generator = require('generate-password');
 const MD5 = require('crypto-js/md5');
+const jwt = require('jsonwebtoken');
 
 @injectable({scope: BindingScope.TRANSIENT})
 export class SecurityUserService {
@@ -72,9 +74,26 @@ export class SecurityUserService {
       },
     });
     if (login) {
-      let user = this.repositoryUser.findById(credentials2FA.userId);
+      let user = await  this.repositoryUser.findById(credentials2FA.userId);
       return user;
     }
     return null;
+  }
+
+  /**
+   * jwt generation
+   * @param user user information
+   * @returns token
+   */
+
+  creationToken(user: User): string{
+    let details={
+      name:`${user.firstName} ${user.secondName} ${user.firstLastName} ${user.secondLastName}`,
+      role: user.roleId,
+      email: user.email
+    }
+    let token = jwt.sign(details, SecurityConfiguration.keyJWT);
+    return token;
+
   }
 }

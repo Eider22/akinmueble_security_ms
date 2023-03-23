@@ -216,12 +216,16 @@ export class UserController {
     credentials: AuthenticationFactor,
   ): Promise<object> {
     let user = await this.serviceSecurity.verifyCode2FA(credentials);
-    if (user) {
-      return {
-        // user:{
-        // },token:
-      };
+    if(user){
+      let token =  this.serviceSecurity.creationToken(user);
+      if (user) {
+        user.password= "";
+        return {
+          user: user,
+          token: token
+        };
+      }
     }
-    throw new HttpErrors[401]('codigo de 2fa invalido.');
+    throw new HttpErrors[401]('codigo de 2fa invalido para el usuario definido.');
   }
 }
