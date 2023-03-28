@@ -46,6 +46,12 @@ export class RoleMenu extends Entity {
   download: boolean;
 
   @property({
+    type: 'boolean',
+    required: true,
+  })
+  upload: boolean;
+
+  @property({
     type: 'string',
   })
   roleId?: string;
