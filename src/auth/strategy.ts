@@ -56,9 +56,6 @@ export class AuthStrategy implements AuthenticationStrategy {
       );
       return response;
     } catch (error) {
-      if (error.name == 'JsonWebTokenError') {
-        throw new HttpErrors[400]('Token inválido');
-      }
       console.log(error);
       throw error;
     }

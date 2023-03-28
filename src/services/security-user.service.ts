@@ -1,6 +1,7 @@
 /* eslint-disable prefer-const */
 import {/* inject, */ BindingScope, injectable} from '@loopback/core';
 import {repository} from '@loopback/repository';
+import {HttpErrors} from '@loopback/rest';
 import {SecurityConfiguration} from '../config/security.config';
 import {AuthenticationFactor, Credentials, User} from '../models';
 import {LoginRepository, UserRepository} from '../repositories';
@@ -102,7 +103,14 @@ export class SecurityUserService {
    * @returns The role of the user.
    */
   getRoleToken(tk: string): string {
-    let obj = jwt.verify(tk, SecurityConfiguration.keyJWT);
-    return obj.role;
+    try {
+      let obj = jwt.verify(tk, SecurityConfiguration.keyJWT);
+      return obj.role;
+    } catch (error) {
+      if (error.name == 'JsonWebTokenError' || error.name == 'SyntaxError') {
+        throw new HttpErrors[400]('Token inválido');
+      }
+      throw error;
+    }
   }
 }
