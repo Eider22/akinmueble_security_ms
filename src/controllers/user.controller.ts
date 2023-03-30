@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-floating-promises */
 /* eslint-disable prefer-const */
+import {authenticate} from '@loopback/authentication';
 import {service} from '@loopback/core';
 import {
   Count,
@@ -21,6 +22,7 @@ import {
   requestBody,
   response,
 } from '@loopback/rest';
+import {SecurityConfiguration} from '../config/security.config';
 import {AuthenticationFactor, Credentials, Login, User} from '../models';
 import {LoginRepository, UserRepository} from '../repositories';
 import {SecurityUserService} from '../services';
@@ -52,7 +54,7 @@ export class UserController {
       },
     })
     user: Omit<User, '_id'>,
-  ): Promise<User> {
+  ): Promise<Omit<User, 'password'>> {
     // eslint-disable-next-line prefer-const
     let password = this.serviceSecurity.createTextRandom(10);
     // eslint-disable-next-line prefer-const
@@ -70,6 +72,13 @@ export class UserController {
     return this.userRepository.count(where);
   }
 
+  @authenticate({
+    strategy: 'auth',
+    options: [
+      SecurityConfiguration.menus.menuUserId,
+      SecurityConfiguration.actions.listAction,
+    ],
+  })
   @get('/user')
   @response(200, {
     description: 'Array of User model instances',
@@ -215,17 +224,35 @@ export class UserController {
     })
     credentials: AuthenticationFactor,
   ): Promise<object> {
-    let user = await this.serviceSecurity.verifyCode2FA(credentials);
-    if(user){
-      let token =  this.serviceSecurity.creationToken(user);
-      if (user) {
-        user.password= "";
-        return {
-          user: user,
-          token: token
-        };
+    try {
+      let user = await this.serviceSecurity.verifyCode2FA(credentials);
+      if (!user) {
+        throw new HttpErrors[401](
+          'codigo de 2fa invalido para el usuario definido.',
+        );
       }
+      let token = this.serviceSecurity.creationToken(user);
+      user.password = '';
+
+      this.userRepository.logins(user._id).patch(
+        {
+          codeState2fa: true,
+          token,
+        },
+        {
+          codeState2fa: false,
+        },
+      );
+
+      return {
+        user: user,
+        token: token,
+      };
+    } catch (error) {
+      console.log(
+        'No se ha almacenado el cambio del estado de token en la base de datos.',
+      );
+      throw new HttpErrors[500](' Error interno en el servidor');
     }
-    throw new HttpErrors[401]('codigo de 2fa invalido para el usuario definido.');
   }
 }

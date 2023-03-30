@@ -1,10 +1,11 @@
 import {inject, lifeCycleObserver, LifeCycleObserver} from '@loopback/core';
 import {juggler} from '@loopback/repository';
+import {SecurityConfiguration} from '../config/security.config';
 
 const config = {
   name: 'mongodb',
   connector: 'mongodb',
-  url: `mongodb+srv://${process.env.USER_MONGODB}:${process.env.PASSWORD_MONGODB}@clusteranki.jakhxmi.mongodb.net/akinmueble_security_msDB?retryWrites=true&w=majority`,
+  url: SecurityConfiguration.connectionStringMongoDB,
   host: 'localhost',
   port: 27017,
   user: '',

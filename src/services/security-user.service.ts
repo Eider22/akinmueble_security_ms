@@ -1,7 +1,8 @@
 /* eslint-disable prefer-const */
 import {/* inject, */ BindingScope, injectable} from '@loopback/core';
 import {repository} from '@loopback/repository';
-import { SecurityConfiguration } from '../config/security.config';
+import {HttpErrors} from '@loopback/rest';
+import {SecurityConfiguration} from '../config/security.config';
 import {AuthenticationFactor, Credentials, User} from '../models';
 import {LoginRepository, UserRepository} from '../repositories';
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -74,7 +75,7 @@ export class SecurityUserService {
       },
     });
     if (login) {
-      let user = await  this.repositoryUser.findById(credentials2FA.userId);
+      let user = await this.repositoryUser.findById(credentials2FA.userId);
       return user;
     }
     return null;
@@ -86,14 +87,30 @@ export class SecurityUserService {
    * @returns token
    */
 
-  creationToken(user: User): string{
-    let details={
-      name:`${user.firstName} ${user.secondName} ${user.firstLastName} ${user.secondLastName}`,
+  creationToken(user: User): string {
+    let details = {
+      name: `${user.firstName} ${user.secondName} ${user.firstLastName} ${user.secondLastName}`,
       role: user.roleId,
-      email: user.email
-    }
+      email: user.email,
+    };
     let token = jwt.sign(details, SecurityConfiguration.keyJWT);
     return token;
+  }
 
+  /**
+   * It takes a string, decodes it, and returns a string
+   * @param {string} tk - the token
+   * @returns The role of the user.
+   */
+  getRoleToken(tk: string): string {
+    try {
+      let obj = jwt.verify(tk, SecurityConfiguration.keyJWT);
+      return obj.role;
+    } catch (error) {
+      if (error.name == 'JsonWebTokenError' || error.name == 'SyntaxError') {
+        throw new HttpErrors[400]('Token inválido');
+      }
+      throw error;
+    }
   }
 }
