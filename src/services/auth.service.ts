@@ -31,7 +31,7 @@ export class AuthService {
 
     let coninue: boolean = false;
     switch (action) {
-      case 'save':
+      case 'create':
         coninue = permit.create;
         break;
       case 'edit':

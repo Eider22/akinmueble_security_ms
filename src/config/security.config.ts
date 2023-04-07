@@ -3,11 +3,12 @@ export namespace SecurityConfiguration {
   export const connectionStringMongoDB = `mongodb+srv://${process.env.USER_MONGODB}:${process.env.PASSWORD_MONGODB}@clusteranki.jakhxmi.mongodb.net/akinmueble_security_msDB?retryWrites=true&w=majority`;
 
   export const menus = {
-    menuUserId: '642258476353cb2d5c653415',
+    menuUserId: '642d9e2202e1597baa66e446',
+    menuRequestId: '642d9e0d02e1597baa66e445',
   };
   export const actions = {
     listAction: 'list',
-    saveAction: 'save',
+    createAction: 'create',
     editAction: 'edit',
     removeAction: 'remove',
     downloadAction: 'download',

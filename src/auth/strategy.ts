@@ -34,6 +34,7 @@ export class AuthStrategy implements AuthenticationStrategy {
    */
   async authenticate(request: Request): Promise<UserProfile | undefined> {
     try {
+      console.log('entro a la estartegia');
       let token = parseBearerToken(request);
       if (!token) {
         throw new HttpErrors[401](
