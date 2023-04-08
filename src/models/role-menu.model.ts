@@ -31,7 +31,7 @@ export class RoleMenu extends Entity {
     type: 'boolean',
     required: true,
   })
-  remove: boolean;
+  del: boolean;
 
   @property({
     type: 'boolean',

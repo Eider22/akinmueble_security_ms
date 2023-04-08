@@ -197,25 +197,29 @@ export class UserController {
     })
     credentials: Credentials,
   ): Promise<object> {
-    let user = await this.serviceSecurity.identifyUser(credentials);
-    if (!user) {
-      throw new HttpErrors[401]('incorrect credentials.');
-    }
+    try {
+      let user = await this.serviceSecurity.identifyUser(credentials);
+      if (!user) {
+        throw new HttpErrors[401]('Credenciales incorrectas.');
+      }
 
-    let code2fa = this.serviceSecurity.createTextRandom(5);
-    let login: Login = new Login();
-    login.userId = user._id!;
-    login.code2fa = code2fa;
-    login.codeState2fa = false;
-    login.token = this.serviceSecurity.creationToken(user);
-    login.tokenState = false;
-    this.repositoryLogin.create(login);
-    user.password = '';
-    // notify the user via mail or sms
-    return user;
+      let code2fa = this.serviceSecurity.createTextRandom(5);
+      let login: Login = new Login();
+      login.userId = user._id!;
+      login.code2fa = code2fa;
+      login.codeState2fa = false;
+      login.token = this.serviceSecurity.creationToken(user);
+      login.tokenState = false;
+      this.repositoryLogin.create(login);
+      user.password = '';
+      // notify the user via mail or sms
+      return user;
+    } catch (error) {
+      throw error;
+    }
   }
 
-  @post('/Validate-permissions')
+  @post('/validate-permissions')
   @response(200, {
     description: 'Validación de permisos de un usuario para lógica de negocio',
     content: {
@@ -286,7 +290,8 @@ export class UserController {
       };
     } catch (error) {
       console.log(
-        'No se ha almacenado el cambio del estado de token en la base de datos.',
+        'No se ha almacenado el cambio del estado del código 2fa en la base de datos.\n',
+        error,
       );
       throw error;
     }
