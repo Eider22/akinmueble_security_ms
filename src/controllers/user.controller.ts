@@ -22,10 +22,11 @@ import {
   requestBody,
   response,
 } from '@loopback/rest';
+import {configurationNotification} from '../config/notification.config';
 import {SecurityConfiguration} from '../config/security.config';
 import {AuthenticationFactor, Credentials, Login, User} from '../models';
 import {LoginRepository, UserRepository} from '../repositories';
-import {SecurityUserService} from '../services';
+import {NotificationService, SecurityUserService} from '../services';
 
 export class UserController {
   constructor(
@@ -35,6 +36,8 @@ export class UserController {
     public serviceSecurity: SecurityUserService,
     @repository(LoginRepository)
     public repositoryLogin: LoginRepository,
+    @service(NotificationService)
+    public serviceNotification: NotificationService,
   ) {}
 
   @post('/user')
@@ -180,7 +183,7 @@ export class UserController {
   async identifyUser(
     @requestBody({
       content: {
-        'aplication/json': {
+        'application/json': {
           schema: getModelSchemaRef(Credentials),
         },
       },
@@ -201,6 +204,14 @@ export class UserController {
     login.tokenState = false;
     this.repositoryLogin.create(login);
     // notify the user via mail or sms
+    let data = {
+      destinationEmail: user.email,
+      destinationName: user.firstName + ' ' + user.secondName,
+      contectEmail: `Su codigo de segundo factor de autentificacion es: ${code2fa}`,
+      subjectEmail: configurationNotification.subject2fa,
+    };
+    let url = configurationNotification.urlNotification2fa;
+    this.serviceNotification.SendEmailGrid(data, url);
     return user;
   }
 
