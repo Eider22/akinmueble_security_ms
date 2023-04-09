@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/naming-convention */
 import {/* inject, */ BindingScope, injectable} from '@loopback/core';
 const fetch = require('node-fetch');
 
@@ -9,7 +10,8 @@ export class NotificationService {
    * Add service methods here
    */
 
-  SendEmailGrid(data: any, url: string) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  SendNotification(data: any, url: string) {
     fetch(url, {
       method: 'post',
       body: JSON.stringify(data),

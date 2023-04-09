@@ -24,7 +24,13 @@ import {
 } from '@loopback/rest';
 import {configurationNotification} from '../config/notification.config';
 import {SecurityConfiguration} from '../config/security.config';
-import {AuthenticationFactor, Credentials, Login, User} from '../models';
+import {
+  AuthenticationFactor,
+  Credentials,
+  CredentialsRecoveryPassword,
+  Login,
+  User,
+} from '../models';
 import {LoginRepository, UserRepository} from '../repositories';
 import {NotificationService, SecurityUserService} from '../services';
 
@@ -211,8 +217,46 @@ export class UserController {
       subjectEmail: configurationNotification.subject2fa,
     };
     let url = configurationNotification.urlNotification2fa;
-    this.serviceNotification.SendEmailGrid(data, url);
+    this.serviceNotification.SendNotification(data, url);
     return user;
+  }
+
+  @post('/recovery-password')
+  @response(200, {
+    description: 'recuperar contraseña mediante correo',
+    content: {'application/json': {schema: getModelSchemaRef(User)}},
+  })
+  async recoveryPasswordUser(
+    @requestBody({
+      content: {
+        'application/json': {
+          schema: getModelSchemaRef(CredentialsRecoveryPassword),
+        },
+      },
+    })
+    credentials: CredentialsRecoveryPassword,
+  ): Promise<object> {
+    let user = await this.userRepository.findOne({
+      where: {
+        email: credentials.email,
+      },
+    });
+    if (!user) {
+      throw new HttpErrors[401]('incorrect credentials.');
+    } else {
+      let newPassword = this.serviceSecurity.createTextRandom(5);
+      let passwordEncripted = this.serviceSecurity.encriptedText(newPassword);
+      user.password = passwordEncripted;
+      this.userRepository.updateById(user._id, user);
+      // notify the user via mail or sms
+      let data = {
+        destinationNumber: user.phone,
+        contentSms: `hola ${user.firstName}, su nueva clave es: ${newPassword}`,
+      };
+      let url = configurationNotification.urlNotificationsms;
+      this.serviceNotification.SendNotification(data, url);
+      return user;
+    }
   }
 
   @post('/verify-2fa')
