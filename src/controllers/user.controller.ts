@@ -23,16 +23,18 @@ import {
   response,
 } from '@loopback/rest';
 import {UserProfile} from '@loopback/security';
+import {configurationNotification} from '../config/notification.config';
 import {SecurityConfiguration} from '../config/security.config';
 import {
   AuthenticationFactor,
   Credentials,
+  CredentialsRecoveryPassword,
   Login,
   RoleMenuPermissions,
   User,
 } from '../models';
 import {LoginRepository, UserRepository} from '../repositories';
-import {SecurityUserService} from '../services';
+import {NotificationService, SecurityUserService} from '../services';
 import {AuthService} from '../services/auth.service';
 
 export class UserController {
@@ -43,6 +45,8 @@ export class UserController {
     public serviceSecurity: SecurityUserService,
     @repository(LoginRepository)
     public repositoryLogin: LoginRepository,
+    @service(NotificationService)
+    public serviceNotification: NotificationService,
     @service(AuthService)
     private serviceAuth: AuthService,
   ) {}
@@ -213,6 +217,14 @@ export class UserController {
       this.repositoryLogin.create(login);
       user.password = '';
       // notify the user via mail or sms
+      let data = {
+        destinationEmail: user.email,
+        destinationName: user.firstName + ' ' + user.secondName,
+        contectEmail: `Su codigo de segundo factor de autentificacion es: ${code2fa}`,
+        subjectEmail: configurationNotification.subject2fa,
+      };
+      let url = configurationNotification.urlNotification2fa;
+      this.serviceNotification.SendNotification(data, url);
       return user;
     } catch (error) {
       throw error;
@@ -242,6 +254,44 @@ export class UserController {
       data.idMenu,
       data.action,
     );
+  }
+
+  @post('/recovery-password')
+  @response(200, {
+    description: 'recuperar contraseña mediante correo',
+    content: {'application/json': {schema: getModelSchemaRef(User)}},
+  })
+  async recoveryPasswordUser(
+    @requestBody({
+      content: {
+        'application/json': {
+          schema: getModelSchemaRef(CredentialsRecoveryPassword),
+        },
+      },
+    })
+    credentials: CredentialsRecoveryPassword,
+  ): Promise<object> {
+    let user = await this.userRepository.findOne({
+      where: {
+        email: credentials.email,
+      },
+    });
+    if (!user) {
+      throw new HttpErrors[401]('incorrect credentials.');
+    } else {
+      let newPassword = this.serviceSecurity.createTextRandom(5);
+      let passwordEncripted = this.serviceSecurity.encriptedText(newPassword);
+      user.password = passwordEncripted;
+      this.userRepository.updateById(user._id, user);
+      // notify the user via mail or sms
+      let data = {
+        destinationNumber: user.phone,
+        contentSms: `hola ${user.firstName}, su nueva clave es: ${newPassword}`,
+      };
+      let url = configurationNotification.urlNotificationsms;
+      this.serviceNotification.SendNotification(data, url);
+      return user;
+    }
   }
 
   @post('/verify-2fa')
