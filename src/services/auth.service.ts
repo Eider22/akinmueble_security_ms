@@ -18,8 +18,20 @@ export class AuthService {
   ): Promise<UserProfile | undefined> {
     let permit = await this.rolMenuRepository.findOne({
       where: {
-        roleId,
-        menuId,
+        roleId: roleId,
+        menuId: menuId,
+      },
+      fields: {
+        _id: true,
+        create: true,
+        list: true,
+        edit: true,
+        assign: true,
+        download: true,
+        upload: true,
+        roleId: true,
+        menuId: true,
+        del: true,
       },
     });
 
@@ -31,7 +43,7 @@ export class AuthService {
 
     let coninue: boolean = false;
     switch (action) {
-      case 'save':
+      case 'create':
         coninue = permit.create;
         break;
       case 'edit':
@@ -40,8 +52,8 @@ export class AuthService {
       case 'list':
         coninue = permit.list;
         break;
-      case 'remove':
-        coninue = permit.remove;
+      case 'delete':
+        coninue = permit.del;
         break;
       case 'assign':
         coninue = permit.assign;

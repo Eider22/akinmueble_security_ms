@@ -7,14 +7,14 @@ import {
   CountSchema,
   Filter,
   FilterExcludingWhere,
-  repository,
   Where,
+  repository,
 } from '@loopback/repository';
 import {
+  HttpErrors,
   del,
   get,
   getModelSchemaRef,
-  HttpErrors,
   param,
   patch,
   post,
@@ -22,6 +22,7 @@ import {
   requestBody,
   response,
 } from '@loopback/rest';
+import {UserProfile} from '@loopback/security';
 import {configurationNotification} from '../config/notification.config';
 import {SecurityConfiguration} from '../config/security.config';
 import {
@@ -29,10 +30,12 @@ import {
   Credentials,
   CredentialsRecoveryPassword,
   Login,
+  RoleMenuPermissions,
   User,
 } from '../models';
 import {LoginRepository, UserRepository} from '../repositories';
 import {NotificationService, SecurityUserService} from '../services';
+import {AuthService} from '../services/auth.service';
 
 export class UserController {
   constructor(
@@ -44,6 +47,8 @@ export class UserController {
     public repositoryLogin: LoginRepository,
     @service(NotificationService)
     public serviceNotification: NotificationService,
+    @service(AuthService)
+    private serviceAuth: AuthService,
   ) {}
 
   @post('/user')
@@ -196,29 +201,59 @@ export class UserController {
     })
     credentials: Credentials,
   ): Promise<object> {
-    let user = await this.serviceSecurity.identifyUser(credentials);
-    if (!user) {
-      throw new HttpErrors[401]('incorrect credentials.');
-    }
+    try {
+      let user = await this.serviceSecurity.identifyUser(credentials);
+      if (!user) {
+        throw new HttpErrors[401]('Credenciales incorrectas.');
+      }
 
-    let code2fa = this.serviceSecurity.createTextRandom(5);
-    let login: Login = new Login();
-    login.userId = user._id!;
-    login.code2fa = code2fa;
-    login.codeState2fa = false;
-    login.token = '';
-    login.tokenState = false;
-    this.repositoryLogin.create(login);
-    // notify the user via mail or sms
-    let data = {
-      destinationEmail: user.email,
-      destinationName: user.firstName + ' ' + user.secondName,
-      contectEmail: `Su codigo de segundo factor de autentificacion es: ${code2fa}`,
-      subjectEmail: configurationNotification.subject2fa,
-    };
-    let url = configurationNotification.urlNotification2fa;
-    this.serviceNotification.SendNotification(data, url);
-    return user;
+      let code2fa = this.serviceSecurity.createTextRandom(5);
+      let login: Login = new Login();
+      login.userId = user._id!;
+      login.code2fa = code2fa;
+      login.codeState2fa = false;
+      login.token = this.serviceSecurity.creationToken(user);
+      login.tokenState = false;
+      this.repositoryLogin.create(login);
+      user.password = '';
+      // notify the user via mail or sms
+      let data = {
+        destinationEmail: user.email,
+        destinationName: user.firstName + ' ' + user.secondName,
+        contectEmail: `Su codigo de segundo factor de autentificacion es: ${code2fa}`,
+        subjectEmail: configurationNotification.subject2fa,
+      };
+      let url = configurationNotification.urlNotification2fa;
+      this.serviceNotification.SendNotification(data, url);
+      return user;
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  @post('/validate-permissions')
+  @response(200, {
+    description: 'Validación de permisos de un usuario para lógica de negocio',
+    content: {
+      'application/json': {schema: getModelSchemaRef(RoleMenuPermissions)},
+    },
+  })
+  async ValidateUserPermissions(
+    @requestBody({
+      content: {
+        'application/json': {
+          schema: getModelSchemaRef(RoleMenuPermissions),
+        },
+      },
+    })
+    data: RoleMenuPermissions,
+  ): Promise<UserProfile | undefined> {
+    let idRole = this.serviceSecurity.getRoleToken(data.token);
+    return this.serviceAuth.verifiacatePermitsUserByRol(
+      idRole,
+      data.idMenu,
+      data.action,
+    );
   }
 
   @post('/recovery-password')
@@ -272,7 +307,7 @@ export class UserController {
   async verifyCode2FA(
     @requestBody({
       content: {
-        'aplication/json': {
+        'application/json': {
           schema: getModelSchemaRef(AuthenticationFactor),
         },
       },
@@ -292,7 +327,7 @@ export class UserController {
       this.userRepository.logins(user._id).patch(
         {
           codeState2fa: true,
-          token,
+          token: token,
         },
         {
           codeState2fa: false,
@@ -305,9 +340,10 @@ export class UserController {
       };
     } catch (error) {
       console.log(
-        'No se ha almacenado el cambio del estado de token en la base de datos.',
+        'No se ha almacenado el cambio del estado del código 2fa en la base de datos.\n',
+        error,
       );
-      throw new HttpErrors[500](' Error interno en el servidor');
+      throw error;
     }
   }
 }
