@@ -59,14 +59,13 @@ export class SecurityUserService {
   }
 
   /**
-   * It takes a userId and a code2fa, and if the code2fa is valid, it returns the
-   * user
-   * @param {AuthenticationFactor} credentials2FA - AuthenticationFactor
-   * @returns The user object
+   * This function verifies a user's 2FA code and generates a token for
+   * authentication.
+   * @param {AuthenticationFactor} credentials2FA - An object containing the user's
+   * authentication factor information, including their user ID and 2FA code.
+   * @returns An object containing the authenticated user and a token.
    */
-  async verifyCode2FA(
-    credentials2FA: AuthenticationFactor,
-  ): Promise<User | null> {
+  async verifyCode2FA(credentials2FA: AuthenticationFactor): Promise<Object> {
     let login = await this.repositoryLogin.findOne({
       where: {
         userId: credentials2FA.userId,
@@ -74,19 +73,36 @@ export class SecurityUserService {
         codeState2fa: false,
       },
     });
-    if (login) {
-      let user = await this.repositoryUser.findById(credentials2FA.userId);
-      return user;
+    if (!login) {
+      throw new HttpErrors[400]('Código invalido');
     }
-    return null;
+    let user = await this.repositoryUser.findById(credentials2FA.userId);
+    if (!user) {
+      throw new HttpErrors[400]('Código invalido');
+    }
+
+    let token = this.creationToken(user);
+    await this.repositoryUser.logins(user._id).patch(
+      {
+        codeState2fa: true,
+        token: token,
+        tokenState: false
+      },
+      {
+        codeState2fa: false,
+      },
+    );
+    user.password = '';
+    return {user, token};
   }
 
   /**
-   * jwt generation
-   * @param user user information
-   * @returns token
+   * The function creates a JSON Web Token (JWT) for a given user object.
+   * @param {User} user - User object containing the user's first name, second name,
+   * first last name, second last name, role ID, and email.
+   * @returns a string which is a JSON Web Token (JWT) that contains the user's
+   * name, role, and email information.
    */
-
   creationToken(user: User): string {
     let details = {
       name: `${user.firstName} ${user.secondName} ${user.firstLastName} ${user.secondLastName}`,
@@ -107,6 +123,7 @@ export class SecurityUserService {
       let obj = jwt.verify(tk, SecurityConfiguration.keyJWT);
       return obj.role;
     } catch (error) {
+      // eslint-disable-next-line eqeqeq
       if (error.name == 'JsonWebTokenError' || error.name == 'SyntaxError') {
         throw new HttpErrors[400]('Token inválido');
       }
