@@ -1,11 +1,9 @@
-/* eslint-disable prefer-const */
-import {/* inject, */ BindingScope, injectable} from '@loopback/core';
+import {BindingScope, injectable} from '@loopback/core';
 import {repository} from '@loopback/repository';
 import {HttpErrors} from '@loopback/rest';
 import {SecurityConfiguration} from '../config/security.config';
 import {AuthenticationFactor, Credentials, User} from '../models';
 import {LoginRepository, UserRepository} from '../repositories';
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const generator = require('generate-password');
 const MD5 = require('crypto-js/md5');
 const jwt = require('jsonwebtoken');
@@ -24,7 +22,6 @@ export class SecurityUserService {
    * @returns A string of n characters that includes numbers.
    */
   createTextRandom(n: number): string {
-    // eslint-disable-next-line prefer-const
     let password = generator.generate({
       length: n,
       numbers: true,
@@ -38,7 +35,6 @@ export class SecurityUserService {
    * @returns the textEncripted variable.
    */
   encriptedText(text: string): string {
-    // eslint-disable-next-line prefer-const
     let textEncripted = MD5(text).toString();
     return textEncripted;
   }
@@ -59,14 +55,13 @@ export class SecurityUserService {
   }
 
   /**
-   * It takes a userId and a code2fa, and if the code2fa is valid, it returns the
-   * user
-   * @param {AuthenticationFactor} credentials2FA - AuthenticationFactor
-   * @returns The user object
+   * This function verifies a user's 2FA code and generates a token for
+   * authentication.
+   * @param {AuthenticationFactor} credentials2FA - An object containing the user's
+   * authentication factor information, including their user ID and 2FA code.
+   * @returns An object containing the authenticated user and a token.
    */
-  async verifyCode2FA(
-    credentials2FA: AuthenticationFactor,
-  ): Promise<User | null> {
+  async verifyCode2FA(credentials2FA: AuthenticationFactor): Promise<Object> {
     let login = await this.repositoryLogin.findOne({
       where: {
         userId: credentials2FA.userId,
@@ -74,19 +69,38 @@ export class SecurityUserService {
         codeState2fa: false,
       },
     });
-    if (login) {
-      let user = await this.repositoryUser.findById(credentials2FA.userId);
-      return user;
+    if (!login) {
+      throw new HttpErrors[400]('Código invalido');
     }
-    return null;
+    let user = await this.repositoryUser.findById(credentials2FA.userId);
+    if (!user) {
+      throw new HttpErrors[400]('Código invalido');
+    }
+    login.token = this.creationToken(user);
+    login.tokenState = false;
+    let token = login.token;
+    this.repositoryLogin.save(login);
+    await this.repositoryUser.logins(user._id).patch(
+      {
+        codeState2fa: true,
+        tokenState: false,
+      },
+      {
+        codeState2fa: false,
+        _id: login._id,
+      },
+    );
+    user.password = '';
+    return {user, token};
   }
 
   /**
-   * jwt generation
-   * @param user user information
-   * @returns token
+   * The function creates a JSON Web Token (JWT) for a given user object.
+   * @param {User} user - User object containing the user's first name, second name,
+   * first last name, second last name, role ID, and email.
+   * @returns a string which is a JSON Web Token (JWT) that contains the user's
+   * name, role, and email information.
    */
-
   creationToken(user: User): string {
     let details = {
       name: `${user.firstName} ${user.secondName} ${user.firstLastName} ${user.secondLastName}`,

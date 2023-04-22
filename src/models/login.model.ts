@@ -29,9 +29,8 @@ export class Login extends Entity {
 
   @property({
     type: 'boolean',
-    required: true,
   })
-  tokenState: boolean;
+  tokenState?: boolean;
 
   @belongsTo(() => User)
   userId: string;

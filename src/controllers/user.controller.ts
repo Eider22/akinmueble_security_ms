@@ -1,5 +1,3 @@
-/* eslint-disable @typescript-eslint/no-floating-promises */
-/* eslint-disable prefer-const */
 import {authenticate} from '@loopback/authentication';
 import {service} from '@loopback/core';
 import {
@@ -69,9 +67,7 @@ export class UserController {
     })
     user: Omit<User, '_id'>,
   ): Promise<Omit<User, 'password'>> {
-    // eslint-disable-next-line prefer-const
     let password = this.serviceSecurity.createTextRandom(10);
-    // eslint-disable-next-line prefer-const
     let passwordEncripted = this.serviceSecurity.encriptedText(password);
     user.password = passwordEncripted;
     return this.userRepository.create(user);
@@ -212,8 +208,6 @@ export class UserController {
       login.userId = user._id!;
       login.code2fa = code2fa;
       login.codeState2fa = false;
-      login.token = this.serviceSecurity.creationToken(user);
-      login.tokenState = false;
       this.repositoryLogin.create(login);
       user.password = '';
       // notify the user via mail or sms
@@ -294,16 +288,22 @@ export class UserController {
     }
   }
 
+  /**
+   *  This is a controller method in a LoopBack 4 application that handles a POST
+   * request to verify a two-factor authentication (2FA) code. It takes in a
+   * request body containing an `AuthenticationFactor` object, which includes the
+   * user's ID and the 2FA code they entered. It then calls the `verifyCode2FA`
+   * method of the `serviceSecurity` instance to verify the code. If the code is
+   * valid, it returns an object with the user's information. If there is an error,
+   * it logs a message and throws the error.
+   *
+   * @param credentials
+   * @returns
+   */
   @post('/verify-2fa')
   @response(200, {
     description: 'verifica el 2fa',
   })
-
-  /**
-   * I want to return an object with two properties: user and token.
-   * @param {AuthenticationFactor} credentials - AuthenticationFactor,
-   * @returns The user object and the token.
-   */
   async verifyCode2FA(
     @requestBody({
       content: {
@@ -315,29 +315,8 @@ export class UserController {
     credentials: AuthenticationFactor,
   ): Promise<object> {
     try {
-      let user = await this.serviceSecurity.verifyCode2FA(credentials);
-      if (!user) {
-        throw new HttpErrors[401](
-          'codigo de 2fa invalido para el usuario definido.',
-        );
-      }
-      let token = this.serviceSecurity.creationToken(user);
-      user.password = '';
-
-      this.userRepository.logins(user._id).patch(
-        {
-          codeState2fa: true,
-          token: token,
-        },
-        {
-          codeState2fa: false,
-        },
-      );
-
-      return {
-        user: user,
-        token: token,
-      };
+      let data = await this.serviceSecurity.verifyCode2FA(credentials);
+      return data;
     } catch (error) {
       console.log(
         'No se ha almacenado el cambio del estado del código 2fa en la base de datos.\n',
