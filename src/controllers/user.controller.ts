@@ -1,6 +1,3 @@
-/* eslint-disable @typescript-eslint/naming-convention */
-/* eslint-disable @typescript-eslint/no-floating-promises */
-/* eslint-disable prefer-const */
 import {authenticate} from '@loopback/authentication';
 import {service} from '@loopback/core';
 import {
@@ -70,9 +67,7 @@ export class UserController {
     })
     user: Omit<User, '_id'>,
   ): Promise<Omit<User, 'password'>> {
-    // eslint-disable-next-line prefer-const
     let password = this.serviceSecurity.createTextRandom(10);
-    // eslint-disable-next-line prefer-const
     let passwordEncripted = this.serviceSecurity.encriptedText(password);
     user.password = passwordEncripted;
     return this.userRepository.create(user);
@@ -202,7 +197,6 @@ export class UserController {
     })
     credentials: Credentials,
   ): Promise<object> {
-    // eslint-disable-next-line no-useless-catch
     try {
       let user = await this.serviceSecurity.identifyUser(credentials);
       if (!user) {
@@ -294,13 +288,18 @@ export class UserController {
     }
   }
 
-  /* This is a controller method in a LoopBack 4 application that handles a POST
-  request to verify a two-factor authentication (2FA) code. It takes in a
-  request body containing an `AuthenticationFactor` object, which includes the
-  user's ID and the 2FA code they entered. It then calls the `verifyCode2FA`
-  method of the `serviceSecurity` instance to verify the code. If the code is
-  valid, it returns an object with the user's information. If there is an error,
-  it logs a message and throws the error. */
+  /**
+   *  This is a controller method in a LoopBack 4 application that handles a POST
+   * request to verify a two-factor authentication (2FA) code. It takes in a
+   * request body containing an `AuthenticationFactor` object, which includes the
+   * user's ID and the 2FA code they entered. It then calls the `verifyCode2FA`
+   * method of the `serviceSecurity` instance to verify the code. If the code is
+   * valid, it returns an object with the user's information. If there is an error,
+   * it logs a message and throws the error.
+   *
+   * @param credentials
+   * @returns
+   */
   @post('/verify-2fa')
   @response(200, {
     description: 'verifica el 2fa',

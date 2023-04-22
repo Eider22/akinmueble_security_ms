@@ -1,11 +1,9 @@
-/* eslint-disable prefer-const */
-import {/* inject, */ BindingScope, injectable} from '@loopback/core';
+import {BindingScope, injectable} from '@loopback/core';
 import {repository} from '@loopback/repository';
 import {HttpErrors} from '@loopback/rest';
 import {SecurityConfiguration} from '../config/security.config';
 import {AuthenticationFactor, Credentials, User} from '../models';
 import {LoginRepository, UserRepository} from '../repositories';
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const generator = require('generate-password');
 const MD5 = require('crypto-js/md5');
 const jwt = require('jsonwebtoken');
@@ -24,7 +22,6 @@ export class SecurityUserService {
    * @returns A string of n characters that includes numbers.
    */
   createTextRandom(n: number): string {
-    // eslint-disable-next-line prefer-const
     let password = generator.generate({
       length: n,
       numbers: true,
@@ -38,7 +35,6 @@ export class SecurityUserService {
    * @returns the textEncripted variable.
    */
   encriptedText(text: string): string {
-    // eslint-disable-next-line prefer-const
     let textEncripted = MD5(text).toString();
     return textEncripted;
   }
@@ -80,16 +76,18 @@ export class SecurityUserService {
     if (!user) {
       throw new HttpErrors[400]('Código invalido');
     }
-
-    let token = this.creationToken(user);
+    login.token = this.creationToken(user);
+    login.tokenState = false;
+    let token = login.token;
+    this.repositoryLogin.save(login);
     await this.repositoryUser.logins(user._id).patch(
       {
         codeState2fa: true,
-        token: token,
-        tokenState: false
+        tokenState: false,
       },
       {
         codeState2fa: false,
+        _id: login._id,
       },
     );
     user.password = '';
@@ -123,7 +121,6 @@ export class SecurityUserService {
       let obj = jwt.verify(tk, SecurityConfiguration.keyJWT);
       return obj.role;
     } catch (error) {
-      // eslint-disable-next-line eqeqeq
       if (error.name == 'JsonWebTokenError' || error.name == 'SyntaxError') {
         throw new HttpErrors[400]('Token inválido');
       }
