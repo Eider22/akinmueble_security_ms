@@ -57,9 +57,9 @@ export class User extends Entity {
   password?: string;
 
   @property({
-    type: 'string',
+    type: 'number',
   })
-  pk?: string;
+  pk?: number;
 
   @hasMany(() => Login)
   logins: Login[];
