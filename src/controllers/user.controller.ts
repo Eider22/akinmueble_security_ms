@@ -27,6 +27,7 @@ import {
   AuthenticationFactor,
   Credentials,
   CredentialsRecoveryPassword,
+  CustomResponse,
   Login,
   RoleMenuPermissions,
   User,
@@ -66,11 +67,27 @@ export class UserController {
       },
     })
     user: Omit<User, '_id'>,
-  ): Promise<Omit<User, 'password'>> {
-    let password = this.serviceSecurity.createTextRandom(10);
-    let passwordEncripted = this.serviceSecurity.encriptedText(password);
-    user.password = passwordEncripted;
-    return this.userRepository.create(user);
+  ): Promise<CustomResponse> {
+    try {
+      let password = this.serviceSecurity.createTextRandom(10);
+      let passwordEncripted = this.serviceSecurity.encriptedText(password);
+      user.password = passwordEncripted;
+      const newUser = await this.userRepository.create(user);
+      const response: CustomResponse = new CustomResponse();
+      if (!newUser) {
+        response.ok = false;
+        response.message = 'No se creó el ususario';
+        response.data = {};
+      }
+      newUser.password = '';
+      response.ok = true;
+      response.message = 'Usuario creado';
+      response.data = newUser;
+
+      return response;
+    } catch (error) {
+      throw error;
+    }
   }
 
   @get('/user/count')
