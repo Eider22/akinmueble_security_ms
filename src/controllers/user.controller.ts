@@ -86,6 +86,29 @@ export class UserController {
 
       return response;
     } catch (error) {
+      if (error.name == 'MongoError' && error.code === 11000) {
+        const userExist = await this.userRepository.findOne({
+          where: {
+            email: user.email,
+          },
+        });
+        const response: CustomResponse = new CustomResponse();
+
+        if (!userExist) {
+          response.ok = false;
+          response.message = 'No se creó el ususario';
+          response.data = {};
+
+          return response;
+        }
+
+        userExist.password = '';
+        response.ok = true;
+        response.message = 'Ya existe usuario';
+        response.data = userExist;
+
+        return response;
+      }
       throw error;
     }
   }
