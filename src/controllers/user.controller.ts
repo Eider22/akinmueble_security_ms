@@ -1,3 +1,7 @@
+/* eslint-disable @typescript-eslint/naming-convention */
+/* eslint-disable @typescript-eslint/no-floating-promises */
+/* eslint-disable @typescript-eslint/no-shadow */
+/* eslint-disable no-useless-catch */
 import {authenticate} from '@loopback/authentication';
 import {service} from '@loopback/core';
 import {
@@ -21,6 +25,7 @@ import {
   response,
 } from '@loopback/rest';
 import {UserProfile} from '@loopback/security';
+import * as crypto from 'crypto';
 import {configurationNotification} from '../config/notification.config';
 import {SecurityConfiguration} from '../config/security.config';
 import {
@@ -69,8 +74,13 @@ export class UserController {
     user: Omit<User, '_id'>,
   ): Promise<CustomResponse> {
     try {
-      let password = this.serviceSecurity.createTextRandom(10);
-      let passwordEncripted = this.serviceSecurity.encriptedText(password);
+      const secretKey = 'Secret';
+      const hash = crypto.createHash('sha256');
+      hash.update(user.email + new Date().toISOString() + secretKey);
+      const emailVerificationHash = hash.digest('hex');
+      user.hash = emailVerificationHash;
+      const password = this.serviceSecurity.createTextRandom(10);
+      const passwordEncripted = this.serviceSecurity.encriptedText(password);
       user.password = passwordEncripted;
       const newUser = await this.userRepository.create(user);
       const response: CustomResponse = new CustomResponse();
@@ -83,6 +93,17 @@ export class UserController {
       response.ok = true;
       response.message = 'Usuario creado';
       response.data = newUser;
+
+      // notify the user via mail or sms
+      const data = {
+        destinationEmail: user.email,
+        destinationName: user.firstName + ' ' + user.secondName,
+        contectEmail: `su codigo de verificacon de cuenta es: ${emailVerificationHash}`,
+        subjectEmail: configurationNotification.subject2fa,
+      };
+
+      const url = configurationNotification.urlNotification2fa;
+      this.serviceNotification.SendNotification(data, url);
 
       return response;
     } catch (error) {
@@ -215,26 +236,26 @@ export class UserController {
     credentials: Credentials,
   ): Promise<object> {
     try {
-      let user = await this.serviceSecurity.identifyUser(credentials);
+      const user = await this.serviceSecurity.identifyUser(credentials);
       if (!user) {
         throw new HttpErrors[401]('Credenciales incorrectas.');
       }
 
-      let code2fa = this.serviceSecurity.createTextRandom(5);
-      let login: Login = new Login();
+      const code2fa = this.serviceSecurity.createTextRandom(5);
+      const login: Login = new Login();
       login.userId = user._id!;
       login.code2fa = code2fa;
       login.codeState2fa = false;
       this.repositoryLogin.create(login);
       user.password = '';
       // notify the user via mail or sms
-      let data = {
+      const data = {
         destinationEmail: user.email,
         destinationName: user.firstName + ' ' + user.secondName,
         contectEmail: `Su codigo de segundo factor de autentificacion es: ${code2fa}`,
         subjectEmail: configurationNotification.subject2fa,
       };
-      let url = configurationNotification.urlNotification2fa;
+      const url = configurationNotification.urlNotification2fa;
       this.serviceNotification.SendNotification(data, url);
       return user;
     } catch (error) {
@@ -259,7 +280,7 @@ export class UserController {
     })
     data: RoleMenuPermissions,
   ): Promise<UserProfile | undefined> {
-    let idRole = this.serviceSecurity.getRoleToken(data.token);
+    const idRole = this.serviceSecurity.getRoleToken(data.token);
     return this.serviceAuth.verifiacatePermitsUserByRol(
       idRole,
       data.idMenu,
@@ -282,7 +303,7 @@ export class UserController {
     })
     credentials: CredentialsRecoveryPassword,
   ): Promise<object> {
-    let user = await this.userRepository.findOne({
+    const user = await this.userRepository.findOne({
       where: {
         email: credentials.email,
       },
@@ -290,16 +311,16 @@ export class UserController {
     if (!user) {
       throw new HttpErrors[401]('incorrect credentials.');
     } else {
-      let newPassword = this.serviceSecurity.createTextRandom(5);
-      let passwordEncripted = this.serviceSecurity.encriptedText(newPassword);
+      const newPassword = this.serviceSecurity.createTextRandom(5);
+      const passwordEncripted = this.serviceSecurity.encriptedText(newPassword);
       user.password = passwordEncripted;
       this.userRepository.updateById(user._id, user);
       // notify the user via mail or sms
-      let data = {
+      const data = {
         destinationNumber: user.phone,
         contentSms: `hola ${user.firstName}, su nueva clave es: ${newPassword}`,
       };
-      let url = configurationNotification.urlNotificationsms;
+      const url = configurationNotification.urlNotificationsms;
       this.serviceNotification.SendNotification(data, url);
       return user;
     }
@@ -332,7 +353,7 @@ export class UserController {
     credentials: AuthenticationFactor,
   ): Promise<object> {
     try {
-      let data = await this.serviceSecurity.verifyCode2FA(credentials);
+      const data = await this.serviceSecurity.verifyCode2FA(credentials);
       return data;
     } catch (error) {
       console.log(

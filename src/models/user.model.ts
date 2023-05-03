@@ -56,8 +56,19 @@ export class User extends Entity {
 
   @property({
     type: 'string',
+    required: true,
   })
-  password?: string;
+  password: string;
+
+  @property({
+    type: 'string',
+  })
+  hash?: string;
+
+  @property({
+    type: 'boolean',
+  })
+  hashState: boolean;
 
   @property({
     type: 'number',
