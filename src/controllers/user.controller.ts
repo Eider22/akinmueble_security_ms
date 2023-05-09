@@ -25,7 +25,7 @@ import {
   response,
 } from '@loopback/rest';
 import {UserProfile} from '@loopback/security';
-import * as crypto from 'crypto';
+
 import {configurationNotification} from '../config/notification.config';
 import {SecurityConfiguration} from '../config/security.config';
 import {
@@ -40,6 +40,7 @@ import {
 import {LoginRepository, UserRepository} from '../repositories';
 import {NotificationService, SecurityUserService} from '../services';
 import {AuthService} from '../services/auth.service';
+import {UserService} from '../services/user.service';
 
 export class UserController {
   constructor(
@@ -53,6 +54,8 @@ export class UserController {
     public serviceNotification: NotificationService,
     @service(AuthService)
     private serviceAuth: AuthService,
+    @service(UserService)
+    protected userService: UserService,
   ) {}
 
   @post('/user')
@@ -64,73 +67,14 @@ export class UserController {
     @requestBody({
       content: {
         'application/json': {
-          schema: getModelSchemaRef(User, {
-            title: 'NewUser',
-            exclude: ['_id'],
-          }),
+          schema: getModelSchemaRef(User, {partial: true}),
         },
       },
     })
     user: Omit<User, '_id'>,
   ): Promise<CustomResponse> {
     try {
-      const secretKey = SecurityConfiguration.hashSecretKey;
-      const hash = crypto.createHash('sha256');
-      hash.update(user.email + new Date().toISOString() + secretKey);
-      console.log('hash line 80', hash);
-      const emailVerificationHash = hash.digest('hex');
-      console.log('emailVerificationHash line 82', emailVerificationHash);
-      user.hash = emailVerificationHash;
-      user.hashState = false;
-      const password = this.serviceSecurity.createTextRandom(10);
-      const passwordEncripted = this.serviceSecurity.encriptedText(password);
-      user.password = passwordEncripted;
-      const newUser = await this.userRepository.create(user);
-      const response: CustomResponse = new CustomResponse();
-
-      if (!newUser) {
-        response.ok = false;
-        response.message = 'No se creó el ususario';
-        response.data = {};
-      }
-
-      if (newUser.roleId == SecurityConfiguration.roleIds.advisor) {
-        const content = `Tu usuario de asesor ha sido creado, ya eres parte de nuestro equipo.Bienvenido!
-        </br> Tus credenciales son:
-        </br> Usuario: ${newUser.email}
-        </br> contraseña: ${password}`;
-
-        const data = {
-          destinationEmail: newUser.email!,
-          destinationName:
-            newUser.firstName + ' ' + newUser.secondName
-              ? newUser.secondName
-              : '' + '' + newUser.firstLastName,
-          contectEmail: `${content}`,
-          subjectEmail: configurationNotification.subjectCustomerNotification,
-        };
-
-        const url = configurationNotification.urlNotification2fa;
-        this.serviceNotification.SendNotification(data, url);
-      }
-
-      newUser.password = '';
-      newUser.hash = '';
-      response.ok = true;
-      response.message = 'Usuario creado';
-      response.data = newUser;
-
-      // notify the user via mail or sms
-      const data = {
-        destinationEmail: user.email,
-        destinationName: user.firstName + ' ' + user.secondName,
-        contectEmail: `por favor verifica tu correo dando click sobre este enlace:  http://localhost:3000/veryfyEmail/${emailVerificationHash}`,
-        subjectEmail: configurationNotification.subject2fa,
-      };
-
-      const url = configurationNotification.urlNotification2fa;
-      this.serviceNotification.SendNotification(data, url);
-
+      const response = await this.userService.createUser(user);
       return response;
     } catch (error) {
       if (error.name == 'MongoError' && error.code === 11000) {
