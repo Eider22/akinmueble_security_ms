@@ -1,3 +1,17 @@
+/* eslint-disable @typescript-eslint/naming-convention */
+/* eslint-disable eqeqeq */
+
+interface formUser {
+  firstName: string;
+  secondName: string;
+  firstLastName: string;
+  secondLastName: string;
+  email: string;
+  password: string;
+  phone: string;
+  idrole: string;
+}
+
 import {BindingScope, injectable} from '@loopback/core';
 import {repository} from '@loopback/repository';
 import {HttpErrors} from '@loopback/rest';
@@ -22,7 +36,7 @@ export class SecurityUserService {
    * @returns A string of n characters that includes numbers.
    */
   createTextRandom(n: number): string {
-    let password = generator.generate({
+    const password = generator.generate({
       length: n,
       numbers: true,
     });
@@ -35,7 +49,7 @@ export class SecurityUserService {
    * @returns the textEncripted variable.
    */
   encriptedText(text: string): string {
-    let textEncripted = MD5(text).toString();
+    const textEncripted = MD5(text).toString();
     return textEncripted;
   }
 
@@ -62,7 +76,7 @@ export class SecurityUserService {
    * @returns An object containing the authenticated user and a token.
    */
   async verifyCode2FA(credentials2FA: AuthenticationFactor): Promise<Object> {
-    let login = await this.repositoryLogin.findOne({
+    const login = await this.repositoryLogin.findOne({
       where: {
         userId: credentials2FA.userId,
         code2fa: credentials2FA.code2fa,
@@ -72,14 +86,19 @@ export class SecurityUserService {
     if (!login) {
       throw new HttpErrors[400]('Código invalido');
     }
-    let user = await this.repositoryUser.findById(credentials2FA.userId);
+    const user = await this.repositoryUser.findById(credentials2FA.userId);
     if (!user) {
       throw new HttpErrors[400]('Código invalido');
     }
     login.token = this.creationToken(user);
     login.tokenState = false;
-    let token = login.token;
-    this.repositoryLogin.save(login);
+    const token = login.token;
+    try {
+      await this.repositoryLogin.save(login);
+      console.log('Login guardado exitosamente');
+    } catch (error) {
+      console.error('Error al guardar el login:', error);
+    }
     await this.repositoryUser.logins(user._id).patch(
       {
         codeState2fa: true,
@@ -102,12 +121,12 @@ export class SecurityUserService {
    * name, role, and email information.
    */
   creationToken(user: User): string {
-    let details = {
+    const details = {
       name: `${user.firstName} ${user.secondName} ${user.firstLastName} ${user.secondLastName}`,
       role: user.roleId,
       email: user.email,
     };
-    let token = jwt.sign(details, SecurityConfiguration.keyJWT);
+    const token = jwt.sign(details, SecurityConfiguration.keyJWT);
     return token;
   }
 
@@ -118,7 +137,7 @@ export class SecurityUserService {
    */
   getRoleToken(tk: string): string {
     try {
-      let obj = jwt.verify(tk, SecurityConfiguration.keyJWT);
+      const obj = jwt.verify(tk, SecurityConfiguration.keyJWT);
       return obj.role;
     } catch (error) {
       if (error.name == 'JsonWebTokenError' || error.name == 'SyntaxError') {
@@ -126,5 +145,25 @@ export class SecurityUserService {
       }
       throw error;
     }
+  }
+
+  async createUser(json: formUser) {
+    const newUser = {
+      firstName: json.firstName,
+      secondName: json.secondName,
+      secondLastName: json.secondLastName,
+      firstLastName: json.firstLastName,
+      email: json.email,
+      phone: json.phone,
+      password: json.password,
+      idrole: json.idrole,
+    };
+
+    const newCreateUser = await this.repositoryUser.create(newUser);
+    if (!newCreateUser) {
+      throw new HttpErrors[400]('No se pudo crear el user');
+    }
+
+    return {newCreateUser};
   }
 }
