@@ -74,11 +74,14 @@ export class UserController {
     user: Omit<User, '_id'>,
   ): Promise<CustomResponse> {
     try {
-      const secretKey = 'Secret';
+      const secretKey = SecurityConfiguration.hashSecretKey;
       const hash = crypto.createHash('sha256');
       hash.update(user.email + new Date().toISOString() + secretKey);
+      console.log('hash line 80', hash);
       const emailVerificationHash = hash.digest('hex');
+      console.log('emailVerificationHash line 82', emailVerificationHash);
       user.hash = emailVerificationHash;
+      user.hashState = false;
       const password = this.serviceSecurity.createTextRandom(10);
       const passwordEncripted = this.serviceSecurity.encriptedText(password);
       user.password = passwordEncripted;
@@ -90,6 +93,7 @@ export class UserController {
         response.data = {};
       }
       newUser.password = '';
+      newUser.hash = '';
       response.ok = true;
       response.message = 'Usuario creado';
       response.data = newUser;
@@ -98,7 +102,7 @@ export class UserController {
       const data = {
         destinationEmail: user.email,
         destinationName: user.firstName + ' ' + user.secondName,
-        contectEmail: `su codigo de verificacon de cuenta es: ${emailVerificationHash}`,
+        contectEmail: `por favor verifica tu correo dando click sobre este enlace:  http://localhost:3000/veryfyEmail/${emailVerificationHash}`,
         subjectEmail: configurationNotification.subject2fa,
       };
 
