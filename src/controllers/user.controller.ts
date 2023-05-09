@@ -87,11 +87,33 @@ export class UserController {
       user.password = passwordEncripted;
       const newUser = await this.userRepository.create(user);
       const response: CustomResponse = new CustomResponse();
+
       if (!newUser) {
         response.ok = false;
         response.message = 'No se creó el ususario';
         response.data = {};
       }
+
+      if (newUser.roleId == SecurityConfiguration.roleIds.advisor) {
+        const content = `Tu usuario de asesor ha sido creado, ya eres parte de nuestro equipo.Bienvenido!
+        </br> Tus credenciales son:
+        </br> Usuario: ${newUser.email}
+        </br> contraseña: ${password}`;
+
+        const data = {
+          destinationEmail: newUser.email!,
+          destinationName:
+            newUser.firstName + ' ' + newUser.secondName
+              ? newUser.secondName
+              : '' + '' + newUser.firstLastName,
+          contectEmail: `${content}`,
+          subjectEmail: configurationNotification.subjectCustomerNotification,
+        };
+
+        const url = configurationNotification.urlNotification2fa;
+        this.serviceNotification.SendNotification(data, url);
+      }
+
       newUser.password = '';
       newUser.hash = '';
       response.ok = true;
@@ -111,6 +133,29 @@ export class UserController {
 
       return response;
     } catch (error) {
+      if (error.name == 'MongoError' && error.code === 11000) {
+        const userExist = await this.userRepository.findOne({
+          where: {
+            email: user.email,
+          },
+        });
+        const response: CustomResponse = new CustomResponse();
+
+        if (!userExist) {
+          response.ok = false;
+          response.message = 'No se creó el ususario';
+          response.data = {};
+
+          return response;
+        }
+
+        userExist.password = '';
+        response.ok = true;
+        response.message = 'Ya existe usuario';
+        response.data = userExist;
+
+        return response;
+      }
       throw error;
     }
   }
