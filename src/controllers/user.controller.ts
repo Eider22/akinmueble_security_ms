@@ -149,8 +149,11 @@ export class UserController {
   async verifyEmail(
     @param.path.string('hash') hash: string,
   ): Promise<CustomResponse> {
-    return this.userService.verifyEmail(hash);
-    // return this.userRepository.find(filter);
+    try {
+      return this.userService.verifyEmail(hash);
+    } catch (error) {
+      throw error;
+    }
   }
 
   @patch('/user')
