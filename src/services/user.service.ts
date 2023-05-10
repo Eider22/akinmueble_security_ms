@@ -112,4 +112,31 @@ export class UserService {
 
     return newUser;
   }
+
+  async verifyEmail(hash: string): Promise<CustomResponse> {
+    const response: CustomResponse = new CustomResponse();
+    const user = await this.userRepository.findOne({
+      where: {
+        hash: hash,
+        hashState: false,
+      },
+    });
+
+    if (!user) {
+      response.ok = false;
+      response.message = 'Su usuario no se ha podido validar';
+      response.data = {};
+
+      return response;
+    }
+
+    response.ok = true;
+    response.message = '¡Felicidades! su usuario ha sido validado';
+    response.data = {};
+
+    user.hashState = true;
+    await this.userRepository.save(user);
+
+    return response;
+  }
 }
