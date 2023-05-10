@@ -135,6 +135,23 @@ export class UserController {
   async find(@param.filter(User) filter?: Filter<User>): Promise<User[]> {
     return this.userRepository.find(filter);
   }
+  @get('/veryfyEmail/{hash}')
+  @response(200, {
+    description: 'Array of User model instances',
+    content: {
+      'application/json': {
+        schema: {
+          items: getModelSchemaRef(CustomResponse),
+        },
+      },
+    },
+  })
+  async verifyEmail(
+    @param.path.string('hash') hash: string,
+  ): Promise<CustomResponse> {
+    return this.userService.verifyEmail(hash);
+    // return this.userRepository.find(filter);
+  }
 
   @patch('/user')
   @response(200, {
