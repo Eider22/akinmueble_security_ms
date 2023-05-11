@@ -33,11 +33,10 @@ import {
   Credentials,
   CredentialsRecoveryPassword,
   CustomResponse,
-  Login,
   RoleMenuPermissions,
   User,
 } from '../models';
-import {LoginRepository, UserRepository} from '../repositories';
+import {UserRepository} from '../repositories';
 import {NotificationService, SecurityUserService} from '../services';
 import {AuthService} from '../services/auth.service';
 import {UserService} from '../services/user.service';
@@ -45,13 +44,13 @@ import {UserService} from '../services/user.service';
 export class UserController {
   constructor(
     @repository(UserRepository)
-    public userRepository: UserRepository,
+    protected userRepository: UserRepository,
     @service(SecurityUserService)
-    public serviceSecurity: SecurityUserService,
-    @repository(LoginRepository)
-    public repositoryLogin: LoginRepository,
+    protected serviceSecurity: SecurityUserService,
+    // @repository(LoginRepository)
+    // protected repositoryLogin: LoginRepository,
     @service(NotificationService)
-    public serviceNotification: NotificationService,
+    protected serviceNotification: NotificationService,
     @service(AuthService)
     private serviceAuth: AuthService,
     @service(UserService)
@@ -61,7 +60,7 @@ export class UserController {
   @post('/user')
   @response(200, {
     description: 'User model instance',
-    content: {'application/json': {schema: getModelSchemaRef(User)}},
+    content: {'application/json': {schema: getModelSchemaRef(CustomResponse)}},
   })
   async create(
     @requestBody({
@@ -74,8 +73,7 @@ export class UserController {
     user: Omit<User, '_id'>,
   ): Promise<CustomResponse> {
     try {
-      const response = await this.userService.createUser(user);
-      return response;
+      return await this.userService.createUser(user);
     } catch (error) {
       if (error.name == 'MongoError' && error.code === 11000) {
         const userExist = await this.userRepository.findOne({
@@ -236,7 +234,7 @@ export class UserController {
   @post('/identify-user')
   @response(200, {
     description: 'identificar un usuario por correo y clave',
-    content: {'application/json': {schema: getModelSchemaRef(User)}},
+    content: {'application/json': {schema: getModelSchemaRef(CustomResponse)}},
   })
   async identifyUser(
     @requestBody({
@@ -247,30 +245,9 @@ export class UserController {
       },
     })
     credentials: Credentials,
-  ): Promise<object> {
+  ): Promise<CustomResponse> {
     try {
-      const user = await this.serviceSecurity.identifyUser(credentials);
-      if (!user) {
-        throw new HttpErrors[401]('Credenciales incorrectas.');
-      }
-
-      const code2fa = this.serviceSecurity.createTextRandom(5);
-      const login: Login = new Login();
-      login.userId = user._id!;
-      login.code2fa = code2fa;
-      login.codeState2fa = false;
-      this.repositoryLogin.create(login);
-      user.password = '';
-      // notify the user via mail or sms
-      const data = {
-        destinationEmail: user.email,
-        destinationName: user.firstName + ' ' + user.secondName,
-        contectEmail: `Su codigo de segundo factor de autentificacion es: ${code2fa}`,
-        subjectEmail: configurationNotification.subject2fa,
-      };
-      const url = configurationNotification.urlNotification2fa;
-      this.serviceNotification.SendNotification(data, url);
-      return user;
+      return await this.serviceSecurity.identifyUser(credentials);
     } catch (error) {
       throw error;
     }
