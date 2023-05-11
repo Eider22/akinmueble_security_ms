@@ -12,12 +12,20 @@ interface formUser {
   idrole: string;
 }
 
-import {BindingScope, injectable} from '@loopback/core';
+import {BindingScope, injectable, service} from '@loopback/core';
 import {repository} from '@loopback/repository';
 import {HttpErrors} from '@loopback/rest';
+import {configurationNotification} from '../config/notification.config';
 import {SecurityConfiguration} from '../config/security.config';
-import {AuthenticationFactor, Credentials, User} from '../models';
+import {
+  AuthenticationFactor,
+  Credentials,
+  CustomResponse,
+  Login,
+  User,
+} from '../models';
 import {LoginRepository, UserRepository} from '../repositories';
+import {NotificationService} from './notification.service';
 const generator = require('generate-password');
 const MD5 = require('crypto-js/md5');
 const jwt = require('jsonwebtoken');
@@ -29,6 +37,8 @@ export class SecurityUserService {
     public repositoryUser: UserRepository,
     @repository(LoginRepository)
     public repositoryLogin: LoginRepository,
+    @service(NotificationService)
+    protected notificationService: NotificationService,
   ) {}
 
   /**
@@ -58,14 +68,50 @@ export class SecurityUserService {
    * @param credentials user credentials
    * @returns user found or null
    */
-  async identifyUser(credentials: Credentials): Promise<User | null> {
+  async identifyUser(credentials: Credentials): Promise<CustomResponse> {
+    const response: CustomResponse = new CustomResponse();
     const user = await this.repositoryUser.findOne({
       where: {
         email: credentials.email,
         password: credentials.password,
       },
     });
-    return user as User;
+
+    if (!user) {
+      throw new HttpErrors[401]('Credenciales incorrectas.');
+    }
+
+    if (user.roleId == SecurityConfiguration.roleIds.customer) {
+      if (!user.hash || !user.hashState) {
+        response.ok = false;
+        response.message = 'El correo no ha sido validado';
+        response.data = {};
+        return response;
+      }
+    }
+
+    const code2fa = this.createTextRandom(5);
+    const login: Login = new Login();
+    login.userId = user._id!;
+    login.code2fa = code2fa;
+    login.codeState2fa = false;
+    this.repositoryLogin.create(login);
+    user.password = '';
+    // notify the user via mail or sms
+    const data = {
+      destinationEmail: user.email,
+      destinationName: user.firstName + ' ' + user.secondName,
+      contectEmail: `Su codigo de segundo factor de autentificacion es: ${code2fa}`,
+      subjectEmail: configurationNotification.subject2fa,
+    };
+    const url = configurationNotification.urlNotification2fa;
+    this.notificationService.SendNotification(data, url);
+
+    response.ok = true;
+    response.message = 'Usuario identificado con éxito';
+    response.data = user;
+
+    return response;
   }
 
   /**

@@ -28,7 +28,8 @@ export class UserService {
     const role = await this.roleRepository.findById(user.roleId);
 
     if (!role) {
-      (response.ok = false), (response.message = 'El rol enviado no existe');
+      response.ok = false;
+      response.message = 'El rol enviado no existe';
       response.data = {};
       return response;
     }
