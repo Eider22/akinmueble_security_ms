@@ -121,7 +121,10 @@ export class SecurityUserService {
    * authentication factor information, including their user ID and 2FA code.
    * @returns An object containing the authenticated user and a token.
    */
-  async verifyCode2FA(credentials2FA: AuthenticationFactor): Promise<Object> {
+  async verifyCode2FA(
+    credentials2FA: AuthenticationFactor,
+  ): Promise<CustomResponse> {
+    const response: CustomResponse = new CustomResponse();
     const login = await this.repositoryLogin.findOne({
       where: {
         userId: credentials2FA.userId,
@@ -144,6 +147,7 @@ export class SecurityUserService {
       console.log('Login guardado exitosamente');
     } catch (error) {
       console.error('Error al guardar el login:', error);
+      throw new HttpErrors[400]('Error al guardar el login');
     }
     await this.repositoryUser.logins(user._id).patch(
       {
@@ -156,7 +160,11 @@ export class SecurityUserService {
       },
     );
     user.password = '';
-    return {user, token};
+
+    response.ok = true;
+    response.message = '2fa verificado con éxito';
+    response.data = {user, token};
+    return response;
   }
 
   /**

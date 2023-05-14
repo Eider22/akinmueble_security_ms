@@ -26,6 +26,7 @@ import {
 } from '@loopback/rest';
 import {UserProfile} from '@loopback/security';
 
+import {use} from 'should';
 import {configurationNotification} from '../config/notification.config';
 import {SecurityConfiguration} from '../config/security.config';
 import {
@@ -292,14 +293,15 @@ export class UserController {
       },
     })
     credentials: CredentialsRecoveryPassword,
-  ): Promise<object> {
+  ): Promise<CustomResponse> {
+    const cusResponse: CustomResponse = new CustomResponse();
     const user = await this.userRepository.findOne({
       where: {
         email: credentials.email,
       },
     });
     if (!user) {
-      throw new HttpErrors[401]('incorrect credentials.');
+      throw new HttpErrors[401]('Credenciales incorrectas.');
     } else {
       const newPassword = this.serviceSecurity.createTextRandom(5);
       const passwordEncripted = this.serviceSecurity.encriptedText(newPassword);
@@ -312,7 +314,10 @@ export class UserController {
       };
       const url = configurationNotification.urlNotificationsms;
       this.serviceNotification.SendNotification(data, url);
-      return user;
+      cusResponse.ok = true;
+      cusResponse.message = 'Proceso hecho con éxito';
+      cusResponse.data = use;
+      return cusResponse;
     }
   }
 
@@ -341,7 +346,7 @@ export class UserController {
       },
     })
     credentials: AuthenticationFactor,
-  ): Promise<object> {
+  ): Promise<CustomResponse> {
     try {
       const data = await this.serviceSecurity.verifyCode2FA(credentials);
       return data;
