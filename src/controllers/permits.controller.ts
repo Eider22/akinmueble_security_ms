@@ -1,3 +1,4 @@
+import {authenticate} from '@loopback/authentication';
 import {
   Count,
   CountSchema,
@@ -17,6 +18,7 @@ import {
   requestBody,
   response,
 } from '@loopback/rest';
+import {SecurityConfiguration} from '../config/security.config';
 import {RoleMenu} from '../models';
 import {RoleMenuRepository} from '../repositories';
 
@@ -26,6 +28,13 @@ export class permitsController {
     public roleMenuRepository: RoleMenuRepository,
   ) {}
 
+  @authenticate({
+    strategy: 'auth',
+    options: [
+      SecurityConfiguration.menus.menuUserId,
+      SecurityConfiguration.actions.createAction,
+    ],
+  })
   @post('/permit')
   @response(200, {
     description: 'RoleMenu model instance',
@@ -47,6 +56,13 @@ export class permitsController {
     return this.roleMenuRepository.create(roleMenu);
   }
 
+  @authenticate({
+    strategy: 'auth',
+    options: [
+      SecurityConfiguration.menus.menuUserId,
+      SecurityConfiguration.actions.listAction,
+    ],
+  })
   @get('/permit/count')
   @response(200, {
     description: 'RoleMenu model count',
@@ -56,6 +72,13 @@ export class permitsController {
     return this.roleMenuRepository.count(where);
   }
 
+  @authenticate({
+    strategy: 'auth',
+    options: [
+      SecurityConfiguration.menus.menuUserId,
+      SecurityConfiguration.actions.listAction,
+    ],
+  })
   @get('/permit')
   @response(200, {
     description: 'Array of RoleMenu model instances',
@@ -74,6 +97,13 @@ export class permitsController {
     return this.roleMenuRepository.find(filter);
   }
 
+  @authenticate({
+    strategy: 'auth',
+    options: [
+      SecurityConfiguration.menus.menuUserId,
+      SecurityConfiguration.actions.listAction,
+    ],
+  })
   @patch('/permit')
   @response(200, {
     description: 'RoleMenu PATCH success count',
@@ -93,6 +123,13 @@ export class permitsController {
     return this.roleMenuRepository.updateAll(roleMenu, where);
   }
 
+  @authenticate({
+    strategy: 'auth',
+    options: [
+      SecurityConfiguration.menus.menuUserId,
+      SecurityConfiguration.actions.listAction,
+    ],
+  })
   @get('/permit/{id}')
   @response(200, {
     description: 'RoleMenu model instance',
@@ -110,6 +147,13 @@ export class permitsController {
     return this.roleMenuRepository.findById(id, filter);
   }
 
+  @authenticate({
+    strategy: 'auth',
+    options: [
+      SecurityConfiguration.menus.menuUserId,
+      SecurityConfiguration.actions.editAction,
+    ],
+  })
   @patch('/permit/{id}')
   @response(204, {
     description: 'RoleMenu PATCH success',
@@ -128,6 +172,13 @@ export class permitsController {
     await this.roleMenuRepository.updateById(id, roleMenu);
   }
 
+  @authenticate({
+    strategy: 'auth',
+    options: [
+      SecurityConfiguration.menus.menuUserId,
+      SecurityConfiguration.actions.editAction,
+    ],
+  })
   @put('/permit/{id}')
   @response(204, {
     description: 'RoleMenu PUT success',
@@ -139,6 +190,13 @@ export class permitsController {
     await this.roleMenuRepository.replaceById(id, roleMenu);
   }
 
+  @authenticate({
+    strategy: 'auth',
+    options: [
+      SecurityConfiguration.menus.menuUserId,
+      SecurityConfiguration.actions.deleteAction,
+    ],
+  })
   @del('/permit/{id}')
   @response(204, {
     description: 'RoleMenu DELETE success',
