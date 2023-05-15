@@ -308,11 +308,12 @@ export class UserController {
       user.password = passwordEncripted;
       this.userRepository.updateById(user._id, user);
       // notify the user via mail or sms
+
       const data = {
-        destinationNumber: user.phone,
+        destinationEmail: user.email,
         contentSms: `hola ${user.firstName}, su nueva clave es: ${newPassword}`,
       };
-      const url = configurationNotification.urlNotificationsms;
+      const url = configurationNotification.urlNotification2fa;
       this.serviceNotification.SendNotification(data, url);
       cusResponse.ok = true;
       cusResponse.message = 'Proceso hecho con éxito';
