@@ -311,7 +311,8 @@ export class UserController {
 
       const data = {
         destinationEmail: user.email,
-        contentSms: `hola ${user.firstName}, su nueva clave es: ${newPassword}`,
+        subjectEmail: configurationNotification.subjectCustomerNotification,
+        contectEmail: `hola ${user.firstName}, su nueva clave es: ${newPassword}`,
       };
       const url = configurationNotification.urlNotification2fa;
       this.serviceNotification.SendNotification(data, url);
