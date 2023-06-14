@@ -1,5 +1,7 @@
+/* eslint-disable @typescript-eslint/naming-convention */
 /* eslint-disable @typescript-eslint/no-floating-promises */
-/* eslint-disable prefer-const */
+/* eslint-disable @typescript-eslint/no-shadow */
+/* eslint-disable no-useless-catch */
 import {authenticate} from '@loopback/authentication';
 import {service} from '@loopback/core';
 import {
@@ -23,58 +25,82 @@ import {
   response,
 } from '@loopback/rest';
 import {UserProfile} from '@loopback/security';
+
+import {use} from 'should';
 import {configurationNotification} from '../config/notification.config';
 import {SecurityConfiguration} from '../config/security.config';
 import {
   AuthenticationFactor,
   Credentials,
   CredentialsRecoveryPassword,
-  Login,
+  CustomResponse,
   RoleMenuPermissions,
   User,
 } from '../models';
-import {LoginRepository, UserRepository} from '../repositories';
+import {UserRepository} from '../repositories';
 import {NotificationService, SecurityUserService} from '../services';
 import {AuthService} from '../services/auth.service';
+import {UserService} from '../services/user.service';
 
 export class UserController {
   constructor(
     @repository(UserRepository)
-    public userRepository: UserRepository,
+    protected userRepository: UserRepository,
     @service(SecurityUserService)
-    public serviceSecurity: SecurityUserService,
-    @repository(LoginRepository)
-    public repositoryLogin: LoginRepository,
+    protected serviceSecurity: SecurityUserService,
+    // @repository(LoginRepository)
+    // protected repositoryLogin: LoginRepository,
     @service(NotificationService)
-    public serviceNotification: NotificationService,
+    protected serviceNotification: NotificationService,
     @service(AuthService)
     private serviceAuth: AuthService,
+    @service(UserService)
+    protected userService: UserService,
   ) {}
 
   @post('/user')
   @response(200, {
     description: 'User model instance',
-    content: {'application/json': {schema: getModelSchemaRef(User)}},
+    content: {'application/json': {schema: getModelSchemaRef(CustomResponse)}},
   })
   async create(
     @requestBody({
       content: {
         'application/json': {
-          schema: getModelSchemaRef(User, {
-            title: 'NewUser',
-            exclude: ['_id'],
-          }),
+          schema: getModelSchemaRef(User, {partial: true}),
         },
       },
     })
     user: Omit<User, '_id'>,
-  ): Promise<Omit<User, 'password'>> {
-    // eslint-disable-next-line prefer-const
-    let password = this.serviceSecurity.createTextRandom(10);
-    // eslint-disable-next-line prefer-const
-    let passwordEncripted = this.serviceSecurity.encriptedText(password);
-    user.password = passwordEncripted;
-    return this.userRepository.create(user);
+  ): Promise<CustomResponse> {
+    try {
+      return await this.userService.createUser(user);
+    } catch (error) {
+      if (error.name == 'MongoError' && error.code === 11000) {
+        const userExist = await this.userRepository.findOne({
+          where: {
+            email: user.email,
+          },
+        });
+        const response: CustomResponse = new CustomResponse();
+
+        if (!userExist) {
+          response.ok = false;
+          response.message = 'No se creó el ususario';
+          response.data = {};
+
+          return response;
+        }
+
+        userExist.password = '';
+        response.ok = true;
+        response.message = 'Ya existe usuario';
+        response.data = userExist;
+
+        return response;
+      }
+      throw error;
+    }
   }
 
   @get('/user/count')
@@ -107,6 +133,26 @@ export class UserController {
   })
   async find(@param.filter(User) filter?: Filter<User>): Promise<User[]> {
     return this.userRepository.find(filter);
+  }
+  @get('/veryfyEmail/{hash}')
+  @response(200, {
+    description: 'Array of User model instances',
+    content: {
+      'application/json': {
+        schema: {
+          items: getModelSchemaRef(CustomResponse),
+        },
+      },
+    },
+  })
+  async verifyEmail(
+    @param.path.string('hash') hash: string,
+  ): Promise<CustomResponse> {
+    try {
+      return this.userService.verifyEmail(hash);
+    } catch (error) {
+      throw error;
+    }
   }
 
   @patch('/user')
@@ -189,7 +235,7 @@ export class UserController {
   @post('/identify-user')
   @response(200, {
     description: 'identificar un usuario por correo y clave',
-    content: {'application/json': {schema: getModelSchemaRef(User)}},
+    content: {'application/json': {schema: getModelSchemaRef(CustomResponse)}},
   })
   async identifyUser(
     @requestBody({
@@ -200,32 +246,9 @@ export class UserController {
       },
     })
     credentials: Credentials,
-  ): Promise<object> {
+  ): Promise<CustomResponse> {
     try {
-      let user = await this.serviceSecurity.identifyUser(credentials);
-      if (!user) {
-        throw new HttpErrors[401]('Credenciales incorrectas.');
-      }
-
-      let code2fa = this.serviceSecurity.createTextRandom(5);
-      let login: Login = new Login();
-      login.userId = user._id!;
-      login.code2fa = code2fa;
-      login.codeState2fa = false;
-      login.token = this.serviceSecurity.creationToken(user);
-      login.tokenState = false;
-      this.repositoryLogin.create(login);
-      user.password = '';
-      // notify the user via mail or sms
-      let data = {
-        destinationEmail: user.email,
-        destinationName: user.firstName + ' ' + user.secondName,
-        contectEmail: `Su codigo de segundo factor de autentificacion es: ${code2fa}`,
-        subjectEmail: configurationNotification.subject2fa,
-      };
-      let url = configurationNotification.urlNotification2fa;
-      this.serviceNotification.SendNotification(data, url);
-      return user;
+      return await this.serviceSecurity.identifyUser(credentials);
     } catch (error) {
       throw error;
     }
@@ -248,7 +271,7 @@ export class UserController {
     })
     data: RoleMenuPermissions,
   ): Promise<UserProfile | undefined> {
-    let idRole = this.serviceSecurity.getRoleToken(data.token);
+    const idRole = this.serviceSecurity.getRoleToken(data.token);
     return this.serviceAuth.verifiacatePermitsUserByRol(
       idRole,
       data.idMenu,
@@ -270,40 +293,52 @@ export class UserController {
       },
     })
     credentials: CredentialsRecoveryPassword,
-  ): Promise<object> {
-    let user = await this.userRepository.findOne({
+  ): Promise<CustomResponse> {
+    const cusResponse: CustomResponse = new CustomResponse();
+    const user = await this.userRepository.findOne({
       where: {
         email: credentials.email,
       },
     });
     if (!user) {
-      throw new HttpErrors[401]('incorrect credentials.');
+      throw new HttpErrors[401]('Credenciales incorrectas.');
     } else {
-      let newPassword = this.serviceSecurity.createTextRandom(5);
-      let passwordEncripted = this.serviceSecurity.encriptedText(newPassword);
+      const newPassword = this.serviceSecurity.createTextRandom(5);
+      const passwordEncripted = this.serviceSecurity.encriptedText(newPassword);
       user.password = passwordEncripted;
       this.userRepository.updateById(user._id, user);
       // notify the user via mail or sms
-      let data = {
-        destinationNumber: user.phone,
-        contentSms: `hola ${user.firstName}, su nueva clave es: ${newPassword}`,
+
+      const data = {
+        destinationEmail: user.email,
+        subjectEmail: configurationNotification.subjectCustomerNotification,
+        contectEmail: `hola ${user.firstName}, su nueva clave es: ${newPassword}`,
       };
-      let url = configurationNotification.urlNotificationsms;
+      const url = configurationNotification.urlNotification2fa;
       this.serviceNotification.SendNotification(data, url);
-      return user;
+      cusResponse.ok = true;
+      cusResponse.message = 'Proceso hecho con éxito';
+      cusResponse.data = use;
+      return cusResponse;
     }
   }
 
+  /**
+   *  This is a controller method in a LoopBack 4 application that handles a POST
+   * request to verify a two-factor authentication (2FA) code. It takes in a
+   * request body containing an `AuthenticationFactor` object, which includes the
+   * user's ID and the 2FA code they entered. It then calls the `verifyCode2FA`
+   * method of the `serviceSecurity` instance to verify the code. If the code is
+   * valid, it returns an object with the user's information. If there is an error,
+   * it logs a message and throws the error.
+   *
+   * @param credentials
+   * @returns
+   */
   @post('/verify-2fa')
   @response(200, {
     description: 'verifica el 2fa',
   })
-
-  /**
-   * I want to return an object with two properties: user and token.
-   * @param {AuthenticationFactor} credentials - AuthenticationFactor,
-   * @returns The user object and the token.
-   */
   async verifyCode2FA(
     @requestBody({
       content: {
@@ -313,31 +348,10 @@ export class UserController {
       },
     })
     credentials: AuthenticationFactor,
-  ): Promise<object> {
+  ): Promise<CustomResponse> {
     try {
-      let user = await this.serviceSecurity.verifyCode2FA(credentials);
-      if (!user) {
-        throw new HttpErrors[401](
-          'codigo de 2fa invalido para el usuario definido.',
-        );
-      }
-      let token = this.serviceSecurity.creationToken(user);
-      user.password = '';
-
-      this.userRepository.logins(user._id).patch(
-        {
-          codeState2fa: true,
-          token: token,
-        },
-        {
-          codeState2fa: false,
-        },
-      );
-
-      return {
-        user: user,
-        token: token,
-      };
+      const data = await this.serviceSecurity.verifyCode2FA(credentials);
+      return data;
     } catch (error) {
       console.log(
         'No se ha almacenado el cambio del estado del código 2fa en la base de datos.\n',

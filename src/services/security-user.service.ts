@@ -1,11 +1,31 @@
-/* eslint-disable prefer-const */
-import {/* inject, */ BindingScope, injectable} from '@loopback/core';
+/* eslint-disable @typescript-eslint/naming-convention */
+/* eslint-disable eqeqeq */
+
+interface formUser {
+  firstName: string;
+  secondName: string;
+  firstLastName: string;
+  secondLastName: string;
+  email: string;
+  password: string;
+  phone: string;
+  idrole: string;
+}
+
+import {BindingScope, injectable, service} from '@loopback/core';
 import {repository} from '@loopback/repository';
 import {HttpErrors} from '@loopback/rest';
+import {configurationNotification} from '../config/notification.config';
 import {SecurityConfiguration} from '../config/security.config';
-import {AuthenticationFactor, Credentials, User} from '../models';
+import {
+  AuthenticationFactor,
+  Credentials,
+  CustomResponse,
+  Login,
+  User,
+} from '../models';
 import {LoginRepository, UserRepository} from '../repositories';
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
+import {NotificationService} from './notification.service';
 const generator = require('generate-password');
 const MD5 = require('crypto-js/md5');
 const jwt = require('jsonwebtoken');
@@ -17,6 +37,8 @@ export class SecurityUserService {
     public repositoryUser: UserRepository,
     @repository(LoginRepository)
     public repositoryLogin: LoginRepository,
+    @service(NotificationService)
+    protected notificationService: NotificationService,
   ) {}
 
   /**
@@ -24,8 +46,7 @@ export class SecurityUserService {
    * @returns A string of n characters that includes numbers.
    */
   createTextRandom(n: number): string {
-    // eslint-disable-next-line prefer-const
-    let password = generator.generate({
+    const password = generator.generate({
       length: n,
       numbers: true,
     });
@@ -38,8 +59,7 @@ export class SecurityUserService {
    * @returns the textEncripted variable.
    */
   encriptedText(text: string): string {
-    // eslint-disable-next-line prefer-const
-    let textEncripted = MD5(text).toString();
+    const textEncripted = MD5(text).toString();
     return textEncripted;
   }
 
@@ -48,52 +68,119 @@ export class SecurityUserService {
    * @param credentials user credentials
    * @returns user found or null
    */
-  async identifyUser(credentials: Credentials): Promise<User | null> {
+  async identifyUser(credentials: Credentials): Promise<CustomResponse> {
+    const response: CustomResponse = new CustomResponse();
     const user = await this.repositoryUser.findOne({
       where: {
         email: credentials.email,
         password: credentials.password,
       },
     });
-    return user as User;
+
+    if (!user) {
+      throw new HttpErrors[401]('Credenciales incorrectas.');
+    }
+
+    if (user.roleId == SecurityConfiguration.roleIds.customer) {
+      if (!user.hash || !user.hashState) {
+        response.ok = false;
+        response.message = 'El correo no ha sido validado';
+        response.data = {};
+        return response;
+      }
+    }
+
+    const code2fa = this.createTextRandom(5);
+    const login: Login = new Login();
+    login.userId = user._id!;
+    login.code2fa = code2fa;
+    login.codeState2fa = false;
+    this.repositoryLogin.create(login);
+    user.password = '';
+    // notify the user via mail or sms
+    const data = {
+      destinationEmail: user.email,
+      destinationName: user.firstName + ' ' + user.secondName,
+      contectEmail: `Su codigo de segundo factor de autentificacion es: ${code2fa}`,
+      subjectEmail: configurationNotification.subject2fa,
+    };
+    const url = configurationNotification.urlNotification2fa;
+    this.notificationService.SendNotification(data, url);
+
+    response.ok = true;
+    response.message = 'Usuario identificado con éxito';
+    response.data = user;
+
+    return response;
   }
 
   /**
-   * It takes a userId and a code2fa, and if the code2fa is valid, it returns the
-   * user
-   * @param {AuthenticationFactor} credentials2FA - AuthenticationFactor
-   * @returns The user object
+   * This function verifies a user's 2FA code and generates a token for
+   * authentication.
+   * @param {AuthenticationFactor} credentials2FA - An object containing the user's
+   * authentication factor information, including their user ID and 2FA code.
+   * @returns An object containing the authenticated user and a token.
    */
   async verifyCode2FA(
     credentials2FA: AuthenticationFactor,
-  ): Promise<User | null> {
-    let login = await this.repositoryLogin.findOne({
+  ): Promise<CustomResponse> {
+    const response: CustomResponse = new CustomResponse();
+    const login = await this.repositoryLogin.findOne({
       where: {
         userId: credentials2FA.userId,
         code2fa: credentials2FA.code2fa,
         codeState2fa: false,
       },
     });
-    if (login) {
-      let user = await this.repositoryUser.findById(credentials2FA.userId);
-      return user;
+    if (!login) {
+      throw new HttpErrors[400]('Código invalido');
     }
-    return null;
+    const user = await this.repositoryUser.findById(credentials2FA.userId);
+    if (!user) {
+      throw new HttpErrors[400]('Código invalido');
+    }
+    login.token = this.creationToken(user);
+    login.tokenState = false;
+    const token = login.token;
+    try {
+      await this.repositoryLogin.save(login);
+      console.log('Login guardado exitosamente');
+    } catch (error) {
+      console.error('Error al guardar el login:', error);
+      throw new HttpErrors[400]('Error al guardar el login');
+    }
+    await this.repositoryUser.logins(user._id).patch(
+      {
+        codeState2fa: true,
+        tokenState: false,
+      },
+      {
+        codeState2fa: false,
+        _id: login._id,
+      },
+    );
+    user.password = '';
+
+    response.ok = true;
+    response.message = '2fa verificado con éxito';
+    response.data = {user, token};
+    return response;
   }
 
   /**
-   * jwt generation
-   * @param user user information
-   * @returns token
+   * The function creates a JSON Web Token (JWT) for a given user object.
+   * @param {User} user - User object containing the user's first name, second name,
+   * first last name, second last name, role ID, and email.
+   * @returns a string which is a JSON Web Token (JWT) that contains the user's
+   * name, role, and email information.
    */
-
   creationToken(user: User): string {
-    let details = {
+    const details = {
       name: `${user.firstName} ${user.secondName} ${user.firstLastName} ${user.secondLastName}`,
       role: user.roleId,
       email: user.email,
     };
-    let token = jwt.sign(details, SecurityConfiguration.keyJWT);
+    const token = jwt.sign(details, SecurityConfiguration.keyJWT);
     return token;
   }
 
@@ -104,7 +191,7 @@ export class SecurityUserService {
    */
   getRoleToken(tk: string): string {
     try {
-      let obj = jwt.verify(tk, SecurityConfiguration.keyJWT);
+      const obj = jwt.verify(tk, SecurityConfiguration.keyJWT);
       return obj.role;
     } catch (error) {
       if (error.name == 'JsonWebTokenError' || error.name == 'SyntaxError') {
@@ -112,5 +199,25 @@ export class SecurityUserService {
       }
       throw error;
     }
+  }
+
+  async createUser(json: formUser) {
+    const newUser = {
+      firstName: json.firstName,
+      secondName: json.secondName,
+      secondLastName: json.secondLastName,
+      firstLastName: json.firstLastName,
+      email: json.email,
+      phone: json.phone,
+      password: json.password,
+      idrole: json.idrole,
+    };
+
+    const newCreateUser = await this.repositoryUser.create(newUser);
+    if (!newCreateUser) {
+      throw new HttpErrors[400]('No se pudo crear el user');
+    }
+
+    return {newCreateUser};
   }
 }

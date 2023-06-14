@@ -1,5 +1,6 @@
 export namespace SecurityConfiguration {
   export const keyJWT = process.env.KEYJWT;
+  export const hashSecretKey = process.env.HASHSECRETKEY;
   export const connectionStringMongoDB = `mongodb+srv://${process.env.USER_MONGODB}:${process.env.PASSWORD_MONGODB}@clusteranki.jakhxmi.mongodb.net/akinmueble_security_msDB?retryWrites=true&w=majority`;
 
   export const menus = {
@@ -14,5 +15,10 @@ export namespace SecurityConfiguration {
     downloadAction: 'download',
     assignAction: 'assign',
     upuploadActionload: 'upload',
+  };
+  export const roleIds = {
+    advisor: '642d9ecb02e1597baa66e448',
+    admin: '64225720d8b31f3e70717387',
+    customer: '642d9eb902e1597baa66e447',
   };
 }

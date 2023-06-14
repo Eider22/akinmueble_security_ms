@@ -1,4 +1,10 @@
-import {Entity, model, property, hasMany, belongsTo} from '@loopback/repository';
+import {
+  Entity,
+  belongsTo,
+  hasMany,
+  model,
+  property,
+} from '@loopback/repository';
 import {Login} from './login.model';
 import {Role} from './role.model';
 
@@ -36,6 +42,9 @@ export class User extends Entity {
   @property({
     type: 'string',
     required: true,
+    index: {
+      unique: true,
+    },
   })
   email: string;
 
@@ -49,6 +58,21 @@ export class User extends Entity {
     type: 'string',
   })
   password?: string;
+
+  @property({
+    type: 'string',
+  })
+  hash?: string;
+
+  @property({
+    type: 'boolean',
+  })
+  hashState?: boolean;
+
+  @property({
+    type: 'number',
+  })
+  pk?: number;
 
   @hasMany(() => Login)
   logins: Login[];
